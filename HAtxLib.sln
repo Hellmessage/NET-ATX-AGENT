@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.8.34004.107
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HAtxLib", "HAtxLib.csproj", "{9F380156-A326-4CB8-9154-37F92B0114FE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HAtxLib", "HAtxLib\HAtxLib.csproj", "{0407AFAD-067C-4D9E-B29B-9CB229E510CA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,15 +11,15 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{9F380156-A326-4CB8-9154-37F92B0114FE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{9F380156-A326-4CB8-9154-37F92B0114FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{9F380156-A326-4CB8-9154-37F92B0114FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{9F380156-A326-4CB8-9154-37F92B0114FE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0407AFAD-067C-4D9E-B29B-9CB229E510CA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0407AFAD-067C-4D9E-B29B-9CB229E510CA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0407AFAD-067C-4D9E-B29B-9CB229E510CA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0407AFAD-067C-4D9E-B29B-9CB229E510CA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {8056C43E-D248-42B5-A122-A6FB3CEC1923}
+		SolutionGuid = {6B229248-F98E-4117-B507-BDF303FB5AA9}
 	EndGlobalSection
 EndGlobal

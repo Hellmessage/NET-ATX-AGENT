@@ -67,7 +67,6 @@ namespace HAtxLib.Utils {
 		//public string Command(params object[] argv) {
 		//	string command = string.Join(":", argv);
 		//	string resultStr = string.Format("{0}{1}", command.Length.ToString("X4"), command);
-
 		//}
 
 		public string Command(string command) {
@@ -173,10 +172,6 @@ namespace HAtxLib.Utils {
 			public int Remote;
 		}
 	}
-
-
-	
-
 
 	public class ADBException : Exception {
 		public ADBException(string message) : base(message) { }

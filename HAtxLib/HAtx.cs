@@ -119,7 +119,6 @@ namespace HAtxLib {
             private readonly string _abi;
             private readonly string _sdk;
 
-            private readonly static string JAR_VERSION = "'v0.1.6'";
             private readonly static string ATX_APP_VERSION = "2.3.3";
             private readonly static string ATX_AGENT_VERSION = "0.10.0";
 
