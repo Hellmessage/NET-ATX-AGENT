@@ -7,16 +7,20 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Threading;
+using System.Web.UI.WebControls.WebParts;
 
 namespace HAtxLib {
 
-	public class HAtx {
+    public class HAtx {
 		private readonly string _serial;
 		private readonly ADBClient _client;
+		private int _port;
 		private string _url = null;
+		private bool _debug = false;
 		public string AtxAgentUrl {
 			get {
 				if (string.IsNullOrWhiteSpace(_url)) {
@@ -34,8 +38,11 @@ namespace HAtxLib {
 		}
 
 		public void Test() {
-			Console.WriteLine(_client.GetProp("ro.product.model"));
-		}
+            var watch = Stopwatch.StartNew();
+            //Console.WriteLine(HApi.Get($"{_url}/info"));
+            watch.Stop();
+            Console.WriteLine($"{watch.Elapsed}");
+        }
 
 		public HAtx(string serial) { 
 			_serial = serial;
@@ -47,12 +54,17 @@ namespace HAtxLib {
 			//_client.Shell("am", "start", "-W", "-n", "com.github.uiautomator/.IdentifyActivity", "-e", "theme", "black");
 		}
 
+		public void SetDebug() {
+			_debug = true;
+		}
+
 		private bool Connect() {
 			int port = _client.ForwardPort(7912);
 			if (port == -1) {
 				return false;
 			}
-			_url = $"http://127.0.0.1:{port}";
+			_port = port;
+            _url = $"http://127.0.0.1:{port}";
 			return true;
 		}
 
@@ -70,20 +82,10 @@ namespace HAtxLib {
 		}
 
 		public UADeviceInfo DeviceInfo() {
-            string url = $"{_url}/jsonrpc/0";
-            JObject json = new JObject {
-                { "jsonrpc", "2.0" },
-                { "id", 1 },
-                { "method", "deviceInfo" }
-            };
-            HttpWebResponse response = HApi.Post(url, json);
-            if (response == null) {
-                return null;
-            }
-            if (response.StatusCode != HttpStatusCode.OK) {
-                return null;
-            }
-            json = JObject.Parse(response.DecodeDefault());
+			JObject json = JsonRpc("deviceInfo");
+			if (json == null) {
+				return null;
+			}
 			if (json.ContainsKey("error")) {
 				Console.WriteLine($"DeviceInfo: {json.Value<JObject>("error")}");
 				return null;
@@ -93,20 +95,75 @@ namespace HAtxLib {
         }
 
         public bool IsAlive() {
-			for (int i = 0; i < 4; i++) {
-				var device = DeviceInfo();
-				if (device == null) {
-					Thread.Sleep(1000);
-					continue;
-				}
-				return true;
-			}
-			return false;
+            var device = DeviceInfo();
+            if (device == null) {
+				return false;
+            }
+            return true;
+        }
+
+		public void SetOrientation(Orientation orientation) {
+			var argv = OrientationDict[orientation];
+			JsonRpc("setOrientation", argv[1]);
+        }
+
+		public void FreezeRotation(bool freezed = true) {
+			JsonRpc("freezeRotation", freezed);
 		}
 
-		public JObject JsonRpc(string method) {
+		public bool ElementExists(By by, int wait = 2000) {
+			JObject result = JsonRpc("waitForExists", by, wait);
+			if (result == null) {
+				throw new ATXException("ElementExists Fail");
+			}
+			if (result.ContainsKey("error")) {
+                throw new ATXException($"ElementExists Fail {result.Value<JObject>("error").ToString(Formatting.None)}");
+            }
+			return result.Value<bool>("result");
+        }
+
+        public JObject JsonRpc(string method, params object[] argv) {
+            var watch = Stopwatch.StartNew();
             string url = $"{_url}/jsonrpc/0";
-            return null;
+            JArray array = new JArray();
+            foreach (var obj in argv) {
+				if (obj is By) {
+                    array.Add((obj as By).ToJson());
+                    continue;
+				}
+                array.Add(obj);
+            }
+			string id = Guid.NewGuid().ToString().Replace("-", "");
+            JObject json = new JObject {
+				{ "jsonrpc", "2.0" },
+				{ "id", id },
+				{ "method", method },
+				{ "params", array }
+            };
+            if (_debug) {
+                Console.WriteLine($"JsonRpc >>> {json.ToString(Formatting.None)}");
+            }
+            try {
+                HttpWebResponse response = HApi.Post(url, json);
+                if (response == null) {
+                    return null;
+                }
+                if (response.StatusCode != HttpStatusCode.OK) {
+                    return null;
+                }
+                json = JObject.Parse(response.DecodeDefault());
+                if (_debug) {
+                    Console.WriteLine($"JsonRpc <<< {json.ToString(Formatting.None)}");
+                }
+                return json;
+            } catch (Exception) {
+				return null;
+			} finally {
+                watch.Stop();
+                if (_debug) {
+                    Console.WriteLine($"JsonRpc [{id}] --- {watch.Elapsed}");
+                }
+			}
 		}
 
 		#region 启动UIAutomator
@@ -120,8 +177,8 @@ namespace HAtxLib {
 				"android.permission.ACCESS_FINE_LOCATION",
 				"android.permission.READ_PHONE_STATE"
 			};
-			Console.WriteLine($"GrantAppPermissions: {_client.Shell(argv)}");
-		}
+			_client.Shell(argv);
+        }
 
 		private bool RunUiautomator(int timeout = 20) {
             if (IsAlive()) {
@@ -401,6 +458,22 @@ namespace HAtxLib {
 			}
 		}
 
-		#endregion
-	}
+        #endregion
+
+        #region 屏幕方向
+        private readonly static Dictionary<Orientation, object[]> OrientationDict = new Dictionary<Orientation, object[]>() {
+            { Orientation.Natural, new object[] { 0, "natural", "n", 0 } },
+            { Orientation.Left, new object[] { 1, "left", "l", 90 } },
+            { Orientation.Upsidedown, new object[] { 2, "upsidedown", "u", 180 } },
+            { Orientation.Right, new object[] { 3, "right", "r", 270 } }
+        };
+
+        public enum Orientation {
+            Natural,
+            Left,
+            Upsidedown,
+			Right
+        }
+        #endregion
+    }
 }

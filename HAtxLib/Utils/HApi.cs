@@ -64,7 +64,7 @@ namespace HAtxLib.Utils {
                 request.KeepAlive = false;
                 SetHeaderValue(request.Headers, "Content-Type", "application/json; charset=UTF-8");
                 if (data != null) {
-                    string postdata = data.ToString();
+                    string postdata = data.ToString(Newtonsoft.Json.Formatting.None);
                     byte[] buffer = Encoding.UTF8.GetBytes(postdata);
                     Stream stream = request.GetRequestStream();
                     stream.Write(buffer, 0, buffer.Length);

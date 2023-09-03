@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace HAtxLib.ADB {
+namespace HAtxLib.ADB.Catch {
 	public class ADBException : Exception {
 		public ADBException(string message) : base(message) { }
 	}

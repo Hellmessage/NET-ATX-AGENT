@@ -1,4 +1,5 @@
-﻿using HAtxLib.ADB.Entity;
+﻿using HAtxLib.ADB.Catch;
+using HAtxLib.ADB.Entity;
 using HAtxLib.Extend;
 using HAtxLib.Utils;
 using System;
@@ -13,14 +14,17 @@ using System.Text;
 namespace HAtxLib.ADB {
     public class ADBSocket : IDisposable {
         private const string DefaultEncoding = "ISO-8859-1";
+        public static Encoding Encoding { get; } = Encoding.GetEncoding(DefaultEncoding);
+        //public static Encoding Encoding { get; } = Encoding.UTF8;
+
         private readonly static string OKAY = "OKAY";
         private readonly static string FAIL = "FAIL";
         private readonly Socket _socket;
         private readonly string _serial;
         private readonly int _port;
         public static int ReceiveBufferSize { get; set; } = 40960;
-        public static Encoding Encoding { get; } = Encoding.GetEncoding(DefaultEncoding);
-        //public static Encoding Encoding { get; } = Encoding.UTF8;
+        
+        
 
         public static ADBSocket Create(string serial) {
             return new ADBSocket(serial);
