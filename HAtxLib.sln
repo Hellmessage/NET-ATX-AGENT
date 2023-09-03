@@ -5,6 +5,10 @@ VisualStudioVersion = 17.8.34004.107
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HAtxLib", "HAtxLib\HAtxLib.csproj", "{0407AFAD-067C-4D9E-B29B-9CB229E510CA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestDemo", "TestDemo\TestDemo.csproj", "{238C351F-9852-4F32-A48E-56180C8FF45B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Demo", "Demo\Demo.csproj", "{D0E1F488-5AFC-4DA6-B49E-08AAD91A8D2C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +19,14 @@ Global
 		{0407AFAD-067C-4D9E-B29B-9CB229E510CA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0407AFAD-067C-4D9E-B29B-9CB229E510CA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0407AFAD-067C-4D9E-B29B-9CB229E510CA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{238C351F-9852-4F32-A48E-56180C8FF45B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{238C351F-9852-4F32-A48E-56180C8FF45B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{238C351F-9852-4F32-A48E-56180C8FF45B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{238C351F-9852-4F32-A48E-56180C8FF45B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D0E1F488-5AFC-4DA6-B49E-08AAD91A8D2C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D0E1F488-5AFC-4DA6-B49E-08AAD91A8D2C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D0E1F488-5AFC-4DA6-B49E-08AAD91A8D2C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D0E1F488-5AFC-4DA6-B49E-08AAD91A8D2C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
