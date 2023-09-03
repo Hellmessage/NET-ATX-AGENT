@@ -15,7 +15,7 @@ using System.Web.UI.WebControls.WebParts;
 
 namespace HAtxLib {
 
-    public class HAtx {
+	public class HAtx {
 		private readonly string _serial;
 		private readonly ADBClient _client;
 		private int _port;
@@ -38,17 +38,15 @@ namespace HAtxLib {
 		}
 
 		public void Test() {
-            var watch = Stopwatch.StartNew();
-            //Console.WriteLine(HApi.Get($"{_url}/info"));
-            watch.Stop();
-            Console.WriteLine($"{watch.Elapsed}");
-        }
 
-		public HAtx(string serial) { 
+		}
+
+		public HAtx(string serial) {
 			_serial = serial;
 			_client = new ADBClient(_serial);
 			Initer initer = new Initer(_client);
-			initer.Install();
+			initer.SetupAtxAgent();
+			//initer.Install();
 			Connect();
 			RunUiautomator();
 			//_client.Shell("am", "start", "-W", "-n", "com.github.uiautomator/.IdentifyActivity", "-e", "theme", "black");
@@ -64,7 +62,7 @@ namespace HAtxLib {
 				return false;
 			}
 			_port = port;
-            _url = $"http://127.0.0.1:{port}";
+			_url = $"http://127.0.0.1:{port}";
 			return true;
 		}
 
@@ -82,88 +80,99 @@ namespace HAtxLib {
 		}
 
 		public UADeviceInfo DeviceInfo() {
-			JObject json = JsonRpc("deviceInfo");
+			var json = JsonRpc("deviceInfo");
 			if (json == null) {
 				return null;
 			}
-			if (json.ContainsKey("error")) {
-				Console.WriteLine($"DeviceInfo: {json.Value<JObject>("error")}");
+			if (json.Error != null) {
+				Console.WriteLine($"DeviceInfo: {json.Error.ToString(Formatting.None)}");
 				return null;
 			}
-			json = json.Value<JObject>("result");
-			return JsonConvert.DeserializeObject<UADeviceInfo>(json.ToString());
-        }
+			
+			JObject data = (JObject)json.Data;
+			return JsonConvert.DeserializeObject<UADeviceInfo>(data.ToString());
+		}
 
-        public bool IsAlive() {
-            var device = DeviceInfo();
-            if (device == null) {
+		public bool IsAlive() {
+			var device = DeviceInfo();
+			if (device == null) {
 				return false;
-            }
-            return true;
-        }
+			}
+			return true;
+		}
 
 		public void SetOrientation(Orientation orientation) {
 			var argv = OrientationDict[orientation];
 			JsonRpc("setOrientation", argv[1]);
-        }
+		}
 
 		public void FreezeRotation(bool freezed = true) {
 			JsonRpc("freezeRotation", freezed);
 		}
 
 		public bool ElementExists(By by, int wait = 2000) {
-			JObject result = JsonRpc("waitForExists", by, wait);
+			var result = JsonRpc("waitForExists", by, wait);
 			if (result == null) {
 				throw new ATXException("ElementExists Fail");
 			}
-			if (result.ContainsKey("error")) {
-                throw new ATXException($"ElementExists Fail {result.Value<JObject>("error").ToString(Formatting.None)}");
-            }
-			return result.Value<bool>("result");
-        }
-
-        public JObject JsonRpc(string method, params object[] argv) {
-            var watch = Stopwatch.StartNew();
-            string url = $"{_url}/jsonrpc/0";
-            JArray array = new JArray();
-            foreach (var obj in argv) {
-				if (obj is By) {
-                    array.Add((obj as By).ToJson());
-                    continue;
-				}
-                array.Add(obj);
-            }
-			string id = Guid.NewGuid().ToString().Replace("-", "");
-            JObject json = new JObject {
-				{ "jsonrpc", "2.0" },
-				{ "id", id },
-				{ "method", method },
-				{ "params", array }
-            };
-            if (_debug) {
-                Console.WriteLine($"JsonRpc >>> {json.ToString(Formatting.None)}");
-            }
-            try {
-                HttpWebResponse response = HApi.Post(url, json);
-                if (response == null) {
-                    return null;
-                }
-                if (response.StatusCode != HttpStatusCode.OK) {
-                    return null;
-                }
-                json = JObject.Parse(response.DecodeDefault());
-                if (_debug) {
-                    Console.WriteLine($"JsonRpc <<< {json.ToString(Formatting.None)}");
-                }
-                return json;
-            } catch (Exception) {
-				return null;
-			} finally {
-                watch.Stop();
-                if (_debug) {
-                    Console.WriteLine($"JsonRpc [{id}] --- {watch.Elapsed}");
-                }
+			if (result.Error != null) {
+				throw new ATXException($"ElementExists Fail {result.Error.ToString(Formatting.None)}");
 			}
+			if (result.Data is bool) {
+				return (bool)result.Data;
+			} else {
+				return false;
+			}
+		}
+
+		public JsonRpcResponse JsonRpc(string method, params object[] argv) {
+			return HRuntime.Run($"JSONRPC<{method}>", () => {
+				string url = $"{_url}/jsonrpc/0";
+				JArray array = new JArray();
+				foreach (var obj in argv) {
+					if (obj is By) {
+						array.Add((obj as By).ToJson());
+						continue;
+					}
+					array.Add(obj);
+				}
+				string id = Guid.NewGuid().ToString().Replace("-", "");
+				JObject json = new JObject {
+					{ "jsonrpc", "2.0" },
+					{ "id", id },
+					{ "method", method },
+					{ "params", array }
+				};
+				if (_debug) {
+					Console.WriteLine($"JsonRpc >>> {json.ToString(Formatting.None)}");
+				}
+				try {
+					using (var socket = HSocket.Create(_url)) {
+						string data = socket.Post("/jsonrpc/0", json);
+						if (_debug) {
+							Console.WriteLine($"JsonRpc <<< {data}");
+						}
+						if (string.IsNullOrWhiteSpace(data)) {
+							return null;
+						}
+						JsonRpcResponse result = JsonConvert.DeserializeObject<JsonRpcResponse>(data);
+						//json = JObject.Parse(data);
+						return result;
+					}
+					//HttpWebResponse response = HApi.Post(url, json);
+					//if (response == null) {
+					//	return null;
+					//}
+					//if (response.StatusCode != HttpStatusCode.OK) {
+					//	return null;
+					//}
+					//json = JObject.Parse(response.DecodeDefault());
+
+				} catch (Exception) {
+					return null;
+				}
+			});
+
 		}
 
 		#region 启动UIAutomator
@@ -178,14 +187,14 @@ namespace HAtxLib {
 				"android.permission.READ_PHONE_STATE"
 			};
 			_client.Shell(argv);
-        }
+		}
 
 		private bool RunUiautomator(int timeout = 20) {
-            if (IsAlive()) {
-                return true;
-            }
-            _ = UIService.Stop();
-            GrantAppPermissions();
+			if (IsAlive()) {
+				return true;
+			}
+			_ = UIService.Stop();
+			GrantAppPermissions();
 			var argv = new string[] {
 				"am",
 				"start",
@@ -197,20 +206,20 @@ namespace HAtxLib {
 				"com.github.uiautomator/.ToastActivity",
 			};
 			Console.WriteLine($"RunUiautomator: {_client.Shell(argv)}");
-            _ = UIService.Start();
+			_ = UIService.Start();
 			Thread.Sleep(500);
-            Console.WriteLine($"Uiautomator Running: {UIService.Running()}");
+			Console.WriteLine($"Uiautomator Running: {UIService.Running()}");
 			while (timeout-- > 0) {
 				if (!UIService.Running()) {
-                    break;
+					break;
 				}
 				if (IsAlive()) {
 					return true;
 				}
 				Thread.Sleep(1000);
 			}
-            _ = UIService.Stop();
-            string result = _client.Shell("am instrument -w -r -e debug false -e class com.github.uiautomator.stub.Stub com.github.uiautomator.test/android.support.test.runner.AndroidJUnitRunner");
+			_ = UIService.Stop();
+			string result = _client.Shell("am instrument -w -r -e debug false -e class com.github.uiautomator.stub.Stub com.github.uiautomator.test/android.support.test.runner.AndroidJUnitRunner");
 			if (result.Contains("does not have a signature matching the target")) {
 				Initer initer = new Initer(_client);
 				initer.SetupAtxApp();
@@ -416,7 +425,7 @@ namespace HAtxLib {
 					if (Directory.Exists(CACHE_PATH)) {
 						try {
 							Directory.Delete(CACHE_PATH, true);
-						} catch(Exception ex) {
+						} catch (Exception ex) {
 							Console.WriteLine($"Clear cache path exception: {ex}");
 						}
 					}
@@ -435,7 +444,7 @@ namespace HAtxLib {
 					_client.Shell("rm", $"{ANDROID_LOCAL_TMP_PATH}{app}.apk");
 				}
 				_client.Shell("pm", "uninstall", "com.github.uiautomator");
-				_client.Shell("pm", "uninstall", "com.github.uiautomator.test"); 
+				_client.Shell("pm", "uninstall", "com.github.uiautomator.test");
 			}
 			#endregion
 
@@ -458,22 +467,22 @@ namespace HAtxLib {
 			}
 		}
 
-        #endregion
+		#endregion
 
-        #region 屏幕方向
-        private readonly static Dictionary<Orientation, object[]> OrientationDict = new Dictionary<Orientation, object[]>() {
-            { Orientation.Natural, new object[] { 0, "natural", "n", 0 } },
-            { Orientation.Left, new object[] { 1, "left", "l", 90 } },
-            { Orientation.Upsidedown, new object[] { 2, "upsidedown", "u", 180 } },
-            { Orientation.Right, new object[] { 3, "right", "r", 270 } }
-        };
+		#region 屏幕方向
+		private readonly static Dictionary<Orientation, object[]> OrientationDict = new Dictionary<Orientation, object[]>() {
+			{ Orientation.Natural, new object[] { 0, "natural", "n", 0 } },
+			{ Orientation.Left, new object[] { 1, "left", "l", 90 } },
+			{ Orientation.Upsidedown, new object[] { 2, "upsidedown", "u", 180 } },
+			{ Orientation.Right, new object[] { 3, "right", "r", 270 } }
+		};
 
-        public enum Orientation {
-            Natural,
-            Left,
-            Upsidedown,
+		public enum Orientation {
+			Natural,
+			Left,
+			Upsidedown,
 			Right
-        }
-        #endregion
-    }
+		}
+		#endregion
+	}
 }

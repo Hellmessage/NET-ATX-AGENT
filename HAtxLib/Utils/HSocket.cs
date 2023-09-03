@@ -4,15 +4,38 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
-
 namespace HAtxLib.Utils {
     public class HSocket : IDisposable {
         private readonly Socket _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        private readonly string _host;
         private readonly int _port;
-        public HSocket(int port) {
-            _port = port;
-            _socket.Connect("127.0.0.1", port);
+
+        public static HSocket Create(string url) {
+            return new HSocket(url);
         }
+
+		public static HSocket Create(string host, int port) {
+			return new HSocket(host, port);
+		}
+
+		public static HSocket Create(int port) {
+			return new HSocket(port);
+		}
+
+		public HSocket(string host, int port) {
+			_port = port;
+			_host = host;
+			_socket.Connect(_host, _port);
+		}
+
+		public HSocket(string url) {
+            Uri uri = new Uri(url);
+			_port = uri.Port;
+            _host = uri.Host;
+			_socket.Connect(_host, _port);
+		}
+
+		public HSocket(int port) : this("127.0.0.1", port){}
 
         public string Post(string path, JObject json) {
             string postdata = json.ToString(Newtonsoft.Json.Formatting.None);
@@ -20,7 +43,7 @@ namespace HAtxLib.Utils {
                 "User-Agent: Hell\r\n" +
                 "Content-Type: application/json; charset=UTF-8\r\n" +
                 "Accept: */*\r\n" +
-                $"Host: 127.0.0.1:{_port}\r\n" +
+                $"Host: {_host}:{_port}\r\n" +
                 "Connection: keep-alive\r\n" +
                 $"Content-Length: {Encoding.UTF8.GetBytes(postdata).Length}\r\n\r\n" +
                 $"{postdata}";
