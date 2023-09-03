@@ -31,6 +31,12 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="ICSharpCode.SharpZipLib, Version=0.85.4.369, Culture=neutral, PublicKeyToken=1b03e6acf1164f73, processorArchitecture=MSIL">
+      <HintPath>packages\ICSharpCode.SharpZipLib.dll.0.85.4.369\lib\net20\ICSharpCode.SharpZipLib.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>packages\Newtonsoft.Json.13.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -41,7 +47,25 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ADB\ADBClient.cs" />
+    <Compile Include="ADB\ADBSocket.cs" />
+    <Compile Include="ADB\catch\ADBException.cs" />
+    <Compile Include="ADB\catch\ADBSocketException.cs" />
+    <Compile Include="ADB\Entity\AndroidAppInfo.cs" />
+    <Compile Include="ADB\Entity\AndroidProcessItem.cs" />
+    <Compile Include="ADB\Entity\ForwardItem.cs" />
+    <Compile Include="Catch\ATXException.cs" />
+    <Compile Include="Catch\ATXIniterException.cs" />
+    <Compile Include="Extend\String.cs" />
+    <Compile Include="HAtx.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Utils\ADBUtils.cs" />
+    <Compile Include="Utils\HProcess.cs" />
+    <Compile Include="Utils\HZip.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+    <None Include="README.md" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
