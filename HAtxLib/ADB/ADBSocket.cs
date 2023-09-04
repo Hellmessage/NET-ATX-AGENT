@@ -25,7 +25,7 @@ namespace HAtxLib.ADB {
 		private readonly int _port;
 		public static int ReceiveBufferSize { get; set; } = 40960;
 
-		private bool IsDebug = true;
+		private bool IsDebug = false;
 
 		public static ADBSocket Create(string serial) {
 			return new ADBSocket(serial);
@@ -52,9 +52,10 @@ namespace HAtxLib.ADB {
 				Connect();
 			}
 		}
-		#endregion
+        #endregion
 
-		public void OpenTransport(params object[] argv) {
+        #region 开启事务
+        public void OpenTransport(params object[] argv) {
 			string command = string.Join(":", new string[] { "host", "transport", _serial });
 			if (argv.Length > 0) {
 				var list = new List<object>() { "host-serial", _serial };
@@ -67,9 +68,10 @@ namespace HAtxLib.ADB {
 			CheckOkay();
 			//PrintDebug($"{command} > True");
 		}
+        #endregion
 
-		#region Forward
-		public void Forward(string local, string remote, bool norebind = false) {
+        #region 端口转发
+        public void Forward(string local, string remote, bool norebind = false) {
 			var list = new List<string> {
 				"forward"
 			};
@@ -119,7 +121,7 @@ namespace HAtxLib.ADB {
 
 		#endregion
 
-		#region SHELL
+		#region Shell
 		public static string Shell(string serial, params object[] argv) {
 			using (ADBSocket socket = new ADBSocket(serial)) {
 				socket.OpenTransport();
@@ -136,9 +138,10 @@ namespace HAtxLib.ADB {
 			CheckOkay();
 			return ReadToClose().Strip();
 		}
-		#endregion
+        #endregion
 
-		public static bool Push(string serial, string file, string path, int mode) {
+        #region Push
+        public static bool Push(string serial, string file, string path, int mode) {
 			if (!File.Exists(file)) {
 				return false;
 			}
@@ -165,22 +168,25 @@ namespace HAtxLib.ADB {
 					byte[] buf = new byte[4];
 					socket._socket.Receive(buf, 0, buf.Length, SocketFlags.None);
 					string state = Encoding.GetString(buf);
-
-					socket.PrintDebug($"{file} -> {path} {state} {(state == OKAY ? " " : socket.ReadToClose())}");
+					//socket.PrintDebug($"{file} -> {path} {state} {(state == OKAY ? " " : socket.ReadToClose())}");
 					return state == OKAY;
 				}
 			}
 		}
+        #endregion
 
-		private void Sync() {
+        #region 异步事务
+        private void Sync() {
 			string command = "sync:";
 			string resultStr = string.Format("{0}{1}", command.Length.ToString("X4"), command);
 			byte[] result = Encoding.GetBytes(resultStr);
 			_socket.Send(result);
 			CheckOkay();
 		}
+        #endregion
 
-		private void CheckOkay() {
+        #region 验证请求
+        private void CheckOkay() {
 			byte[] buf = new byte[4];
 			_socket.Receive(buf, 0, 4, SocketFlags.None);
 			string state = Encoding.GetString(buf);
@@ -192,9 +198,10 @@ namespace HAtxLib.ADB {
 				throw new ADBSocketException("未知错误");
 			}
 		}
+        #endregion
 
-		#region READ
-		private string ReadToEnd() {
+        #region 读取
+        private string ReadToEnd() {
 			byte[] reply = new byte[4];
 			var message = Read(reply);
 			if (message == 0) {
@@ -251,7 +258,7 @@ namespace HAtxLib.ADB {
 		}
 		#endregion
 
-		#region PORT
+		#region 获取Port
 		private bool CheckPortUse(int port) {
 			using (Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)) {
 				try {

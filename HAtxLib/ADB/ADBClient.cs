@@ -112,8 +112,9 @@ namespace HAtxLib.ADB {
 			return ADBSocket.Shell(_serial, "getprop", porp);
         }
 
-		public bool Push(string file, string path, int mode = 493/*755*/) {
-			return ADBSocket.Push(_serial, file, path, mode);
+		public bool Push(string file, string path, int mode = 493) {
+            //MODE -> 755
+            return ADBSocket.Push(_serial, file, path, mode);
 		}
 
 		public bool IsScreenOn() {

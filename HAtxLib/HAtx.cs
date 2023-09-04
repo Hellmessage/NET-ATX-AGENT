@@ -19,7 +19,6 @@ namespace HAtxLib {
 		private int _port = -1;
 		private string _url = null;
 		private bool _debug = false;
-
 		public string AtxAgentUrl {
 			get {
 				if (string.IsNullOrWhiteSpace(_url)) {
@@ -30,7 +29,6 @@ namespace HAtxLib {
 				return _url;
 			}
 		}
-
 		public string AtxAgentWs {
             get {
                 if (_port == -1) {
@@ -41,7 +39,6 @@ namespace HAtxLib {
                 return $"ws://127.0.0.1:{_port}";
             }
         }
-
 		private UIAutomatorService UIService {
 			get {
 				return new UIAutomatorService(this);
@@ -72,22 +69,33 @@ namespace HAtxLib {
 			return true;
 		}
 
-		public string DumpHierarchy() {
-			HttpWebResponse response = HApi.Get($"{_url}/dump/hierarchy");
-			if (response == null) {
-				return null;
-			}
-			Console.WriteLine(response.StatusCode);
-			if (response.StatusCode == HttpStatusCode.OK) {
-				string data = response.DecodeDefault();
-				Console.WriteLine("DUMP: " + data);
-				JObject json = JObject.Parse(data);
-				return json.Value<string>("result");
-			}
-			return null;
+        #region DUMP屏幕
+        /// <summary>
+        /// DUMP屏幕
+        /// </summary>
+        public string DumpHierarchy() {
+			return HRuntime.Run("屏幕DUMP", () => {
+				using (HSocket socket = HSocket.Create(_url)) {
+					string data = socket.Get("/dump/hierarchy");
+					if (string.IsNullOrWhiteSpace(data)) {
+						return null;
+					}
+					try {
+                        JObject json = JObject.Parse(data);
+                        return json.Value<string>("result");
+                    } catch (Exception) {
+						return data;
+					}
+				}
+			});
 		}
+        #endregion
 
-		public UADeviceInfo DeviceInfo() {
+        #region 设备信息
+        /// <summary>
+        /// 设备信息
+        /// </summary>
+        public UADeviceInfo DeviceInfo() {
 			var json = JsonRpc("deviceInfo");
 			if (json == null) {
 				return null;
@@ -96,12 +104,16 @@ namespace HAtxLib {
 				Console.WriteLine($"DeviceInfo: {json.Error.ToString(Formatting.None)}");
 				return null;
 			}
-			
 			JObject data = (JObject)json.Data;
 			return JsonConvert.DeserializeObject<UADeviceInfo>(data.ToString());
 		}
+        #endregion
 
-		public bool IsAlive() {
+        #region 是否在线
+        /// <summary>
+        /// 判断是否在线
+        /// </summary>
+        public bool IsAlive() {
 			int size = 10;
 			while (size-- > 0) {
                 var device = DeviceInfo();
@@ -113,17 +125,33 @@ namespace HAtxLib {
             }
 			return false;
 		}
+        #endregion
 
-		public void SetOrientation(Orientation orientation) {
-			var argv = OrientationDict[orientation];
-			JsonRpc("setOrientation", argv[1]);
+        #region 设置屏幕方向
+        /// <summary>
+        /// 设置屏幕方向
+        /// </summary>
+        public void SetOrientation(Orientation orientation) {
+			JsonRpc("setOrientation", OrientationDict[orientation][1]);
 		}
+        #endregion
 
-		public void FreezeRotation(bool freezed = true) {
+        #region 锁定屏幕
+        /// <summary>
+        /// 锁定屏幕方向 
+        /// True 自动 False 锁定
+        /// </summary>
+        public void FreezeRotation(bool freezed = true) {
 			JsonRpc("freezeRotation", freezed);
 		}
+        #endregion
 
-		public bool ElementExists(By by, int wait = 2000) {
+        #region 判断元素是否存在
+		/// <summary>
+		/// 检测元素是否存在
+		/// </summary>
+		/// <exception cref="ATXException"></exception>
+        public bool ElementExists(By by, int wait = 2000) {
 			var result = JsonRpc("waitForExists", by, wait);
 			if (result == null) {
 				throw new ATXException("ElementExists Fail");
@@ -137,8 +165,29 @@ namespace HAtxLib {
 				return false;
 			}
 		}
+        #endregion
 
-		public JsonRpcResponse JsonRpc(string method, params object[] argv) {
+        #region 按钮点击
+		/// <summary>
+		/// 按下按钮
+		/// </summary>
+        public void Press(string key) {
+            JsonRpc("pressKey", key);
+        }
+
+        /// <summary>
+        /// 按下按钮
+        /// </summary>
+        public void Press(PressKey key) {
+            JsonRpc("pressKey", PressKeyDict[key]);
+        }
+        #endregion
+
+        #region JSONRPC基函数
+        /// <summary>
+        /// JSONRPC基函数
+        /// </summary>
+        public JsonRpcResponse JsonRpc(string method, params object[] argv) {
 			return HRuntime.Run($"JSONRPC<{method}>", () => {
 				string url = $"{_url}/jsonrpc/0";
 				JArray array = new JArray();
@@ -175,12 +224,12 @@ namespace HAtxLib {
 					return null;
 				}
 			});
-
 		}
+        #endregion
 
-		#region 启动UIAutomator
+        #region 启动UIAutomator
 
-		private void GrantAppPermissions() {
+        private void GrantAppPermissions() {
 			var argv = new string[] {
 				"pm",
 				"grant",
@@ -294,14 +343,15 @@ namespace HAtxLib {
 			public void SetupAtxAgent() {
 				_client.KillProcessByName("atx-agent");
 				_client.Shell(ATX_AGENT_PATH, "server", "--stop");
+				Thread.Sleep(500);
 				if (IsAtxAgentOutdated()) {
 					GithubDown(ATX_AGENT_DOWN_URL, ATX_AGENT_CAHCE_FILE);
 					string file = Path.GetDirectoryName(ATX_AGENT_CAHCE_FILE) + $"\\{_abi}\\atx-agent";
 					if (!File.Exists(file)) {
 						HZip.UnzipTgz(ATX_AGENT_CAHCE_FILE, Path.GetDirectoryName(file));
 					}
-					_client.Push(file, ATX_AGENT_PATH);
-				}
+                    Console.WriteLine($"PUSH {file}: {_client.Push(file, ATX_AGENT_PATH)}");
+                }
 				_client.Shell(ATX_AGENT_PATH, "server", "--nouia", "-d", "--addr", ATX_LISTEN_ADDR);
 				int size = 10;
 				while (!CheckAtxAgentVersion()) {
@@ -319,16 +369,20 @@ namespace HAtxLib {
 				if (port == -1) {
 					return false;
 				}
-				string url = $"http://127.0.0.1:{port}/version";
-				HttpWebResponse response = HApi.Get(url);
-				if (response == null) {
-					return false;
-				}
-				string data = response.DecodeDefault();
-				if (string.IsNullOrWhiteSpace(data)) {
-					return false;
-				}
-				return true;
+				using (HSocket socket = HSocket.Create("127.0.0.1", port)) {
+					string data = socket.Get("/version");
+					return string.IsNullOrWhiteSpace(data);
+                }
+				//	string url = $"http://127.0.0.1:{port}/version";
+				//HttpWebResponse response = HApi.Get(url);
+				//if (response == null) {
+				//	return false;
+				//}
+				//string data = response.DecodeDefault();
+				//if (string.IsNullOrWhiteSpace(data)) {
+				//	return false;
+				//}
+				//return true;
 			}
 
 
@@ -362,10 +416,8 @@ namespace HAtxLib {
 						string url = $"{GITHUB_BASEURL}{GITHUB_DOWN_APK_PATH}{ATX_APP_VERSION}/{app}.apk";
 						string file = $"{CACHE_PATH}apk/{ATX_APP_VERSION}/{app}.apk";
 						GithubDown(url, file);
-						_client.Push(file, tmp, 420/*644*/);
-						_client.Shell("pm", "install", "-r", "-t", tmp);
-                        //Console.WriteLine($"{tmp}: {_client.Push(file, tmp, 420/*644*/)}");
-                        //Console.WriteLine($"{tmp} Install: {_client.Shell("pm", "install", "-r", "-t", tmp)}");
+                        Console.WriteLine($"PUSH {tmp}: {_client.Push(file, tmp, 420)}");
+                        Console.WriteLine($"INSTALL {tmp}: {_client.Shell("pm", "install", "-r", "-t", tmp)}");
                     }
 				}
 			}
@@ -396,27 +448,34 @@ namespace HAtxLib {
 					Console.WriteLine("Android R (sdk:30) has no minicap resource");
 					return;
 				}
-				string base_url = $"{GITHUB_BASEURL}/stf-binaries/raw/0.3.0/node_modules/@devicefarmer/minicap-prebuilt/prebuilt/";
-				string so_url = $"{base_url}{_abi}/lib/android-{_sdk}/minicap.so";
-				string minicap_url = $"{base_url}{_abi}/bin/minicap";
-				string so_file = $"{CACHE_PATH}minicap/{_abi}/minicap.so";
-				string minicap_file = $"{CACHE_PATH}minicap/{_abi}/minicap";
-				GithubDown(so_url, so_file);
-				GithubDown(minicap_url, minicap_file);
-                _client.Push(minicap_file, $"{ANDROID_LOCAL_TMP_PATH}minicap");
-				_client.Push(so_file, $"{ANDROID_LOCAL_TMP_PATH}minicap.so");
-                //Console.WriteLine($"{ANDROID_LOCAL_TMP_PATH}minicap: {_client.Push(minicap_file, $"{ANDROID_LOCAL_TMP_PATH}minicap")}");
-                //Console.WriteLine($"{ANDROID_LOCAL_TMP_PATH}minicap.so: {_client.Push(so_file, $"{ANDROID_LOCAL_TMP_PATH}minicap.so")}");
+                string base_url = $"{GITHUB_BASEURL}/stf-binaries/raw/0.3.0/node_modules/@devicefarmer/minicap-prebuilt/prebuilt/";
+                string result = _client.Shell("ls", "-a", "/data/local/tmp");
+				var list = new List<string>(result.Split(' '));
+				if (!list.Contains("minicap.so")) {
+                    string so_url = $"{base_url}{_abi}/lib/android-{_sdk}/minicap.so";
+                    string so_file = $"{CACHE_PATH}minicap/{_abi}/minicap.so";
+                    GithubDown(so_url, so_file);
+                    Console.WriteLine($"PUSH {ANDROID_LOCAL_TMP_PATH}minicap.so: {_client.Push(so_file, $"{ANDROID_LOCAL_TMP_PATH}minicap.so")}");
+                }
+                if (!list.Contains("minicap")) {
+                    string minicap_url = $"{base_url}{_abi}/bin/minicap";
+                    string minicap_file = $"{CACHE_PATH}minicap/{_abi}/minicap";
+                    GithubDown(minicap_url, minicap_file);
+                    Console.WriteLine($"PUSH {ANDROID_LOCAL_TMP_PATH}minicap: {_client.Push(minicap_file, $"{ANDROID_LOCAL_TMP_PATH}minicap")}");
+                }
             }
             #endregion
 
             #region minitouch
             public void SetupMinitouch() {
-				string base_url = $"{GITHUB_BASEURL}/stf-binaries/raw/0.3.0/node_modules/@devicefarmer/minitouch-prebuilt/prebuilt/{_abi}/bin/minitouch";
-				string minitouch_file = $"{CACHE_PATH}minitouch/{_abi}/minitouch";
-				GithubDown(base_url, minitouch_file);
-				_client.Push(minitouch_file, $"{ANDROID_LOCAL_TMP_PATH}minitouch");
-                //Console.WriteLine($"{ANDROID_LOCAL_TMP_PATH}minitouch: {_client.Push(minitouch_file, $"{ANDROID_LOCAL_TMP_PATH}minitouch")}");
+                string result = _client.Shell("ls", "-a", "/data/local/tmp");
+                var list = new List<string>(result.Split(' '));
+                if (!list.Contains("minitouch")) {
+                    string base_url = $"{GITHUB_BASEURL}/stf-binaries/raw/0.3.0/node_modules/@devicefarmer/minitouch-prebuilt/prebuilt/{_abi}/bin/minitouch";
+                    string minitouch_file = $"{CACHE_PATH}minitouch/{_abi}/minitouch";
+                    GithubDown(base_url, minitouch_file);
+                    Console.WriteLine($"PUSH {ANDROID_LOCAL_TMP_PATH}minitouch: {_client.Push(minitouch_file, $"{ANDROID_LOCAL_TMP_PATH}minitouch")}");
+                }
             }
 			#endregion
 
@@ -443,7 +502,9 @@ namespace HAtxLib {
 			}
 
 			public void Uninstall() {
-				_client.Shell(ATX_AGENT_PATH, "server", "--stop");
+                _client.KillProcessByName("atx-agent");
+                _client.Shell(ATX_AGENT_PATH, "server", "--stop");
+				Thread.Sleep(1000);
 				_client.Shell("rm", ATX_AGENT_PATH);
 				_client.Shell("rm", $"{ANDROID_LOCAL_TMP_PATH}minicap");
 				_client.Shell("rm", $"{ANDROID_LOCAL_TMP_PATH}minicap.so");
@@ -454,31 +515,42 @@ namespace HAtxLib {
 				_client.Shell("pm", "uninstall", "com.github.uiautomator");
 				_client.Shell("pm", "uninstall", "com.github.uiautomator.test");
 			}
-			#endregion
+            #endregion
 
-			private void GithubDown(string url, string file) {
+            #region 下载
+            private void GithubDown(string url, string file) {
 				DownLock.EnterWriteLock();
-				string path = Path.GetDirectoryName(file);
-				if (!Directory.Exists(path)) {
-					Directory.CreateDirectory(path);
-				}
-				if (File.Exists(file)) {
-					Thread.Sleep(1000);
-					DownLock.ExitWriteLock();
-					return;
-				}
-				using (var client = new WebClient()) {
-					client.Headers.Add("user-agent", "Hell");
-					client.DownloadFile(url, file);
-				}
-				DownLock.ExitWriteLock();
+				try {
+                    string path = Path.GetDirectoryName(file);
+                    if (!Directory.Exists(path)) {
+                        Directory.CreateDirectory(path);
+                    }
+                    if (File.Exists(file)) {
+                        return;
+                    }
+					HRuntime.Run("下载任务", () => {
+						using (var client = new WebClient()) {
+							client.Headers.Add("user-agent", "Hell");
+							client.DownloadFile(url, file);
+						}
+					});
+					Console.WriteLine($"DOWN {file}: 完成");
+                } catch (Exception) {
+                    if (File.Exists(file)) {
+                        File.Delete(file);
+                    }
+                    Console.WriteLine($"DOWN {file}: 失败");
+                } finally {
+                    DownLock.ExitWriteLock();
+                }
 			}
-		}
+            #endregion
+        }
 
-		#endregion
+        #endregion
 
-		#region 屏幕方向
-		private readonly static Dictionary<Orientation, object[]> OrientationDict = new Dictionary<Orientation, object[]>() {
+        #region 屏幕方向
+        private readonly static Dictionary<Orientation, object[]> OrientationDict = new Dictionary<Orientation, object[]>() {
 			{ Orientation.Natural, new object[] { 0, "natural", "n", 0 } },
 			{ Orientation.Left, new object[] { 1, "left", "l", 90 } },
 			{ Orientation.Upsidedown, new object[] { 2, "upsidedown", "u", 180 } },
@@ -492,5 +564,47 @@ namespace HAtxLib {
 			Right
 		}
 		#endregion
-	}
+
+		#region PressKey(按键)
+		private readonly static Dictionary<PressKey, string> PressKeyDict = new Dictionary<PressKey, string>() {
+			{ PressKey.Home, "home" },
+			{ PressKey.Back, "back" },
+			{ PressKey.Left, "left" },
+			{ PressKey.Right, "right" },
+			{ PressKey.Up, "up" },
+			{ PressKey.Down, "down" },
+			{ PressKey.Center, "center" },
+			{ PressKey.Menu, "menu" },
+			{ PressKey.Search, "search" },
+			{ PressKey.Enter, "enter" },
+			{ PressKey.Delete, "delete" },
+			{ PressKey.Recent, "recent" },
+			{ PressKey.VolumeUp, "volume_up" },
+			{ PressKey.VolumeDown, "volume_down" },
+			{ PressKey.VolumeMute, "volume_mute" },
+			{ PressKey.Camera, "camera" },
+			{ PressKey.Power, "power" },
+        };
+
+		public enum PressKey {
+			Home,
+			Back,
+			Left,
+			Right,
+			Up,
+			Down,
+			Center, 
+			Menu,
+			Search,
+			Enter,
+			Delete,
+            Recent,
+            VolumeUp,
+			VolumeDown,
+            VolumeMute,
+            Camera,
+            Power
+        }
+        #endregion
+    }
 }
