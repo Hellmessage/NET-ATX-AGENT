@@ -13,7 +13,7 @@ namespace HAtxLib.Utils {
             try {
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
                 request.Method = "GET";
-                request.Timeout = 5 * 60 * 1000;
+                request.Timeout = 2000;
                 request.KeepAlive = false;
                 return (HttpWebResponse)request.GetResponse();
             } catch (WebException e) {
@@ -27,7 +27,7 @@ namespace HAtxLib.Utils {
             try {
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
                 request.Method = "DELETE";
-                request.Timeout = 5 * 60 * 1000;
+                request.Timeout = 2000;
                 request.KeepAlive = false;
                 return (HttpWebResponse)request.GetResponse();
             } catch (WebException e) {
@@ -41,7 +41,7 @@ namespace HAtxLib.Utils {
             try {
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
                 request.Method = "POST";
-                request.Timeout = 5 * 60 * 1000;
+                request.Timeout = 2000;
                 request.KeepAlive = false;
                 if (!string.IsNullOrEmpty(data)) {
                     byte[] buffer = Encoding.UTF8.GetBytes(data);
@@ -60,7 +60,7 @@ namespace HAtxLib.Utils {
             try {
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
                 request.Method = "POST";
-                request.Timeout = 5 * 60 * 1000;
+                request.Timeout = 2000;
                 request.KeepAlive = false;
                 SetHeaderValue(request.Headers, "Content-Type", "application/json; charset=UTF-8");
                 if (data != null) {

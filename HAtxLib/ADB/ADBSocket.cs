@@ -148,11 +148,6 @@ namespace HAtxLib.ADB {
                     byte[] buffer = new byte[4096];
                     int size = stream.Read(buffer, 0, buffer.Length);
                     while (size > 0) {
-                        //if (size != buffer.Length) {
-                        //    byte[] def = new byte[size];
-                        //    Array.Copy(buffer, def, size);
-                        //    buffer = def;
-                        //}
                         socket._socket.Send(Encoding.GetBytes("DATA"));
                         socket._socket.Send(BitConverter.GetBytes(size));
                         socket._socket.Send(buffer, size, SocketFlags.None);

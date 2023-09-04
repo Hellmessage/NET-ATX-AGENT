@@ -18,9 +18,10 @@ namespace HAtxLib {
 	public class HAtx {
 		private readonly string _serial;
 		private readonly ADBClient _client;
-		private int _port;
+		private int _port = -1;
 		private string _url = null;
 		private bool _debug = false;
+
 		public string AtxAgentUrl {
 			get {
 				if (string.IsNullOrWhiteSpace(_url)) {
@@ -31,6 +32,18 @@ namespace HAtxLib {
 				return _url;
 			}
 		}
+
+		public string AtxAgentWs {
+            get {
+                if (_port == -1) {
+                    if (!Connect()) {
+                        throw new ATXException("Connect Error");
+                    }
+                }
+                return $"ws://127.0.0.1:{_port}";
+            }
+        }
+
 		private UIAutomatorService UIService {
 			get {
 				return new UIAutomatorService(this);
@@ -45,10 +58,9 @@ namespace HAtxLib {
 			_serial = serial;
 			_client = new ADBClient(_serial);
 			Initer initer = new Initer(_client);
-			initer.SetupAtxAgent();
-			//initer.Install();
-			Connect();
-			RunUiautomator();
+			initer.Install();
+			Console.WriteLine($"HAtx<{_serial}> Connect: {Connect()}");
+			HRuntime.Run("运行 UIAUTOMATOR", () => Console.WriteLine($"HAtx<{_serial}> RunUiautomator: {RunUiautomator()}"));
 			//_client.Shell("am", "start", "-W", "-n", "com.github.uiautomator/.IdentifyActivity", "-e", "theme", "black");
 		}
 
@@ -71,8 +83,10 @@ namespace HAtxLib {
 			if (response == null) {
 				return null;
 			}
+			Console.WriteLine(response.StatusCode);
 			if (response.StatusCode == HttpStatusCode.OK) {
 				string data = response.DecodeDefault();
+				Console.WriteLine("DUMP: " + data);
 				JObject json = JObject.Parse(data);
 				return json.Value<string>("result");
 			}
@@ -156,18 +170,8 @@ namespace HAtxLib {
 							return null;
 						}
 						JsonRpcResponse result = JsonConvert.DeserializeObject<JsonRpcResponse>(data);
-						//json = JObject.Parse(data);
 						return result;
 					}
-					//HttpWebResponse response = HApi.Post(url, json);
-					//if (response == null) {
-					//	return null;
-					//}
-					//if (response.StatusCode != HttpStatusCode.OK) {
-					//	return null;
-					//}
-					//json = JObject.Parse(response.DecodeDefault());
-
 				} catch (Exception) {
 					return null;
 				}
@@ -190,10 +194,13 @@ namespace HAtxLib {
 		}
 
 		private bool RunUiautomator(int timeout = 20) {
-			if (IsAlive()) {
+			//if (IsAlive()) {
+			//	return true;
+			//}
+			if (UIService.Running()) {
 				return true;
 			}
-			_ = UIService.Stop();
+			Console.WriteLine($"Uiautomator Service Stop: {UIService.Stop()}");
 			GrantAppPermissions();
 			var argv = new string[] {
 				"am",
@@ -206,19 +213,19 @@ namespace HAtxLib {
 				"com.github.uiautomator/.ToastActivity",
 			};
 			Console.WriteLine($"RunUiautomator: {_client.Shell(argv)}");
-			_ = UIService.Start();
+			Console.WriteLine($"Uiautomator Service Start: {UIService.Start()}");
 			Thread.Sleep(500);
 			Console.WriteLine($"Uiautomator Running: {UIService.Running()}");
 			while (timeout-- > 0) {
 				if (!UIService.Running()) {
-					break;
+					continue;
 				}
 				if (IsAlive()) {
 					return true;
 				}
 				Thread.Sleep(1000);
 			}
-			_ = UIService.Stop();
+			UIService.Stop();
 			string result = _client.Shell("am instrument -w -r -e debug false -e class com.github.uiautomator.stub.Stub com.github.uiautomator.test/android.support.test.runner.AndroidJUnitRunner");
 			if (result.Contains("does not have a signature matching the target")) {
 				Initer initer = new Initer(_client);
@@ -241,7 +248,7 @@ namespace HAtxLib {
 			private readonly static string ATX_AGENT_VERSION = "0.10.0";
 
 			private readonly static ReaderWriterLockSlim DownLock = new ReaderWriterLockSlim();
-			private readonly static string CACHE_PATH = "cache/";
+			private readonly static string CACHE_PATH = $"{AppDomain.CurrentDomain.BaseDirectory}/cache/";
 			private readonly static string ATX_LISTEN_ADDR = "127.0.0.1:7912";
 			private readonly static string GITHUB_BASEURL = "https://github.com/openatx";
 			private readonly static string GITHUB_DOWN_APK_PATH = "/android-uiautomator-server/releases/download/";
@@ -332,7 +339,8 @@ namespace HAtxLib {
 			private bool IsAtxAgentOutdated() {
 				try {
 					string version = _client.Shell(ATX_AGENT_PATH, "version");
-					if (version == "dev") {
+                    Console.WriteLine($"AtxAgent version: {version}");
+                    if (version == "dev") {
 						return false;
 					}
 					var nv = ATX_AGENT_VERSION.Split('.');
@@ -341,7 +349,8 @@ namespace HAtxLib {
 						return true;
 					}
 					return int.Parse(ov[2]) < int.Parse(nv[2]);
-				} catch (Exception) {
+				} catch (Exception ex) {
+					Console.WriteLine($"123 {ex}");
 					return true;
 				}
 			}
@@ -394,8 +403,8 @@ namespace HAtxLib {
 				string base_url = $"{GITHUB_BASEURL}/stf-binaries/raw/0.3.0/node_modules/@devicefarmer/minicap-prebuilt/prebuilt/";
 				string so_url = $"{base_url}{_abi}/lib/android-{_sdk}/minicap.so";
 				string minicap_url = $"{base_url}{_abi}/bin/minicap";
-				string so_file = $"{CACHE_PATH}minicap/{_abi}/minicap.so".Replace("/", "\\");
-				string minicap_file = $"{CACHE_PATH}minicap/{_abi}/minicap".Replace("/", "\\");
+				string so_file = $"{CACHE_PATH}minicap/{_abi}/minicap.so";
+				string minicap_file = $"{CACHE_PATH}minicap/{_abi}/minicap";
 				GithubDown(so_url, so_file);
 				GithubDown(minicap_url, minicap_file);
 				Console.WriteLine($"{ANDROID_LOCAL_TMP_PATH}minicap: {_client.Push(minicap_file, $"{ANDROID_LOCAL_TMP_PATH}minicap")}");
@@ -406,7 +415,7 @@ namespace HAtxLib {
 			#region minitouch
 			public void SetupMinitouch() {
 				string base_url = $"{GITHUB_BASEURL}/stf-binaries/raw/0.3.0/node_modules/@devicefarmer/minitouch-prebuilt/prebuilt/{_abi}/bin/minitouch";
-				string minitouch_file = $"{CACHE_PATH}minitouch/{_abi}/minitouch".Replace("/", "\\");
+				string minitouch_file = $"{CACHE_PATH}minitouch/{_abi}/minitouch";
 				GithubDown(base_url, minitouch_file);
 				Console.WriteLine($"{ANDROID_LOCAL_TMP_PATH}minitouch: {_client.Push(minitouch_file, $"{ANDROID_LOCAL_TMP_PATH}minitouch")}");
 			}

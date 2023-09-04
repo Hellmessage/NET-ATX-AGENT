@@ -1,11 +1,12 @@
-﻿using Newtonsoft.Json;
+﻿using HAtxLib.Extend;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using System.Text;
 
 namespace HAtxLib.UIAutomator {
 
-    public enum ByMask {
+	public enum ByMask {
 		Text = 0x01,
 		TextContains = 0x02,
 		TextMatches = 0x04,
@@ -62,50 +63,53 @@ namespace HAtxLib.UIAutomator {
 			{ ByMask.Instance,				new ByItem(){ Name = "instance", Flag = 0, Mask = (int)ByMask.Instance } },
 		};
 		private const string DefaultEncoding = "ISO-8859-1";
-        public static Encoding Encoding { get; } = Encoding.GetEncoding(DefaultEncoding);
+		public static Encoding Encoding { get; } = Encoding.GetEncoding(DefaultEncoding);
 		private ByMask Mask { get; set; }
-        private string Value { get; set; }
+		private string Value { get; set; }
 		private JArray ChildOrSibling { get; set; } = new JArray();
 		private JArray ChildOrSiblingSelector { get; set; } = new JArray();
 		private By[] SubBy { get; set; } = new By[0];
 
+		private By() {}
+
+		public static By Create(ByMask mask, string value, params By[] sub) {
+			return new By() {
+				Mask = mask,
+				Value = value,
+				SubBy = sub
+			};
+		}
 
 		public override string ToString() {
-            return ToJson().ToString(Formatting.None);
-        }
+			return ToJson().ToString(Formatting.None);
+		}
 
 		public JObject ToJson() {
-            JObject json = new JObject {
-                { "childOrSibling", ChildOrSibling },
-                { "childOrSiblingSelector", ChildOrSiblingSelector },
-                { MaskDict[Mask].Name, Value }
-            };
+			JObject json = new JObject {
+				{ "childOrSibling", ChildOrSibling },
+				{ "childOrSiblingSelector", ChildOrSiblingSelector },
+				{ MaskDict[Mask].Name, Value }
+			};
 			int mask = (int)Mask;
-            foreach (By by in SubBy) {
+			foreach (By by in SubBy) {
 				mask |= (int)by.Mask;
 				json.Add(MaskDict[by.Mask].Name, by.Value);
 			}
 			json.Add("mask", mask);
 			return json;
-        }
+		}
 
-        public static By ResourceId(string value, params By[] bys) {
-			By by = new By {
-				Mask = ByMask.ResourceId,
-				Value = value,
-				SubBy = bys
-			};
-            return by;
+		public static By ResourceId(string value, params By[] sub) {
+			return Create(ByMask.ResourceId, value, sub);
 		}
 
 		public static By Text(string value) {
-            By by = new By {
-                Mask = ByMask.Text,
-                Value = value,
-            };
-            return by;
-        }
+			return Create(ByMask.Text, value);
+		}
 
+		public static By Description(string value) {
+			return Create(ByMask.Description, value);
+		}
 
 		internal class ByItem {
 			public string Name { get; set; }

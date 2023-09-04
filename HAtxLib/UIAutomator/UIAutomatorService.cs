@@ -1,43 +1,46 @@
 ﻿using HAtxLib.Utils;
 using Newtonsoft.Json.Linq;
-using System.Net;
 
 namespace HAtxLib.UIAutomator {
     internal class UIAutomatorService {
-        private readonly static string SERVICE_NAME = "uiautomator";
-        private readonly string _url;
+		private readonly static string SERVICE_NAME = "uiautomator";
+		private readonly static string _path = $"/services/{SERVICE_NAME}";
+		private readonly string _url;
 
-        public UIAutomatorService(HAtx atx) {
-            _url = $"{atx.AtxAgentUrl}/services/{SERVICE_NAME}";
-        }
+		public UIAutomatorService(HAtx atx) {
+			_url = atx.AtxAgentUrl;
+		}
 
-        public bool Start() {
-            HttpWebResponse response = HApi.Post(_url, "");
-            if (response == null) {
-                return false;
+		public bool Start() {
+			using (HSocket socket = HSocket.Create(_url)) {
+				string data = socket.Post(_path, null);
+				if (data == null) {
+					return false;
+				}
+				return true;
+			}
+		}
+
+		public bool Stop() {
+            using (HSocket socket = HSocket.Create(_url)) {
+                string data = socket.Delete(_path);
+                if (data == null) {
+                    return false;
+                }
+                return true;
             }
-            return response.StatusCode == HttpStatusCode.OK;
-        }
+		}
 
-        public bool Stop() {
-            HttpWebResponse response = HApi.Delete(_url);
-            if (response == null) {
-                return false;
-            }
-            return response.StatusCode == HttpStatusCode.OK;
-        }
+		public bool Running() {
+			using (HSocket socket = HSocket.Create(_url)) {
+				string data = socket.Get(_path);
+				if (data == null) {
+					return false;
+				}
+				JObject json = JObject.Parse(data);
+				return json.Value<bool>("running");
+			}
+		}
 
-        public bool Running() {
-            HttpWebResponse response = HApi.Get(_url);
-            if (response == null) {
-                return false;
-            }
-            if (response.StatusCode == HttpStatusCode.OK) {
-                JObject json = JObject.Parse(response.DecodeDefault());
-                return json.Value<bool>("running");
-            }
-            return false;
-        }
-
-    }
+	}
 }
