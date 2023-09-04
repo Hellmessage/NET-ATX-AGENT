@@ -13,7 +13,7 @@ namespace HAtxLib.Utils {
 			var watch = Stopwatch.StartNew();
 			action.Invoke();
 			watch.Stop();
-			Console.WriteLine($"{name} 执行时间: {watch.Elapsed.TotalMilliseconds}/ms");
+			Console.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {name} 执行时间: {watch.Elapsed.TotalMilliseconds}/ms");
 		}
 
 		public static T Run<T>(Func<T> action) {
@@ -24,7 +24,15 @@ namespace HAtxLib.Utils {
 			var watch = Stopwatch.StartNew();
 			T value = action.Invoke();
 			watch.Stop();
-			Console.WriteLine($"{name} 执行时间: {watch.Elapsed.TotalMilliseconds}/ms");
+			Console.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {name} 执行时间: {watch.Elapsed.TotalMilliseconds}/ms");
+			return value;
+		}
+
+		public static T Time<T>(Func<T> action, out int usetime) {
+			var watch = Stopwatch.StartNew();
+			T value = action.Invoke();
+			watch.Stop();
+			usetime = (int)watch.Elapsed.TotalMilliseconds;
 			return value;
 		}
 

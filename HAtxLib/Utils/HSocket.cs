@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
@@ -80,7 +81,31 @@ namespace HAtxLib.Utils {
 			byte[] headerBuffer = ReadEndWith("\r\n\r\n");
 			raw = Encoding.UTF8.GetString(headerBuffer).ToLower();
 			var result = HttpResult.Create(raw);
-			result.SetContent((result.ContentLength > 0 ? Encoding.UTF8.GetString(ReadLength(result.ContentLength)) : result.ContentLength == -1 ? ReadToClose() : "").Strip());
+			if (result.ContentLength == -1) {
+				if (result.Headers.ContainsKey("transfer-encoding")) {
+					string te = result.Headers["transfer-encoding"];
+					if (te == "chunked") {
+						StringBuilder content = new StringBuilder();
+						while (true) {
+							string line = Encoding.UTF8.GetString(ReadEndWith("\r\n")).Strip();
+							int size = Convert.ToInt32(line, 16);
+							if (size > 0) {
+								line = Encoding.UTF8.GetString(ReadEndWith("\r\n"));
+								content.Append(line.Strip());
+							} else {
+								break;
+							}
+						}
+						result.SetContent(content.ToString());
+					} else {
+						result.SetContent(ReadToClose().Strip());
+					}
+				} else {
+					result.SetContent(ReadToClose().Strip());
+				}
+			} else {
+				result.SetContent((result.ContentLength > 0 ? Encoding.UTF8.GetString(ReadLength(result.ContentLength)) : ReadToClose()).Strip());
+			}
 			return result;
 		}
 

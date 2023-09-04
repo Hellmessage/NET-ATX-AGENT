@@ -20,7 +20,12 @@ namespace HAtxLib {
 		private string _url = null;
 		private bool _debug = false;
 
-		public int ElementMaxWaitTime { get; set; } = 2000; 
+		public int ElementMaxWaitTime { get; set; } = 2000;
+		// 检测中延时
+		public int ElementClickExistDelay { get; set; } = 60;
+		// 点击是延迟
+		public int ElementClickDelay { get; set; } = 200;
+
 		public string AtxAgentUrl {
 			get {
 				if (string.IsNullOrWhiteSpace(_url)) {
@@ -184,7 +189,12 @@ namespace HAtxLib {
 				wait = ElementMaxWaitTime;
 			}
 			if (by.Mask == ByMask.Xpath) {
-				return by.XpathToAndroid(DumpHierarchy());
+				string xml = DumpWindowHierarchy();
+				bool exist = by.XpathToAndroid(xml);
+				if (!exist) {
+					Thread.Sleep(ElementClickExistDelay);
+				}
+				return exist;
 			}
 			var result = JsonRpc("waitForExists", by, wait) ?? throw new ATXException("ElementExists Fail");
 			if (result.Error != null) {
@@ -200,9 +210,17 @@ namespace HAtxLib {
 			if (wait == -1) {
 				wait = ElementMaxWaitTime;
 			}
-			if (ElementExists(by, wait)) {
-				if (by.Mask == ByMask.Xpath) {
-					return Click(by.Pos.X, by.Pos.Y);
+			while (wait > 0) {
+				bool exist = HRuntime.Time(() => {
+					return ElementExists(by, 60);
+				}, out int time);
+				wait -= time;
+				if (exist) {
+					Thread.Sleep(ElementClickDelay);
+					if (by.Mask == ByMask.Xpath) {
+						by.XpathToAndroid(DumpWindowHierarchy());
+						return Click(by.Pos.X, by.Pos.Y);
+					}
 				}
 			}
 			return false;
