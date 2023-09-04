@@ -13,31 +13,35 @@ namespace HAtxLib.UIAutomator {
 
 		public bool Start() {
 			using (HSocket socket = HSocket.Create(_url)) {
-				string data = socket.Post(_path, null);
-				if (data == null) {
+				var result = socket.HttpDelete(_path);
+				if (result == null || result.Code != 200) {
 					return false;
 				}
+				//string data = socket.PostData(_path, null);
+				//if (data == null) {
+				//	return false;
+				//}
 				return true;
 			}
 		}
 
 		public bool Stop() {
             using (HSocket socket = HSocket.Create(_url)) {
-                string data = socket.Delete(_path);
-                if (data == null) {
-                    return false;
-                }
+				var result = socket.HttpDelete(_path);
+				if (result == null || result.Code != 200) {
+					return false;
+				}
                 return true;
             }
 		}
 
 		public bool Running() {
 			using (HSocket socket = HSocket.Create(_url)) {
-				string data = socket.Get(_path);
-				if (data == null) {
+				var result = socket.HttpGet(_path);
+				if (result == null || result.Code != 200) {
 					return false;
 				}
-				JObject json = JObject.Parse(data);
+				JObject json = JObject.Parse(result.Content);
 				return json.Value<bool>("running");
 			}
 		}

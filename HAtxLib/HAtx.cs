@@ -76,16 +76,12 @@ namespace HAtxLib {
         public string DumpHierarchy() {
 			return HRuntime.Run("屏幕DUMP", () => {
 				using (HSocket socket = HSocket.Create(_url)) {
-					string data = socket.Get("/dump/hierarchy");
-					if (string.IsNullOrWhiteSpace(data)) {
+					var result = socket.HttpGet("/dump/hierarchy");
+					if (result == null || result.Code != 200) {
 						return null;
 					}
-					try {
-                        JObject json = JObject.Parse(data);
-                        return json.Value<string>("result");
-                    } catch (Exception) {
-						return data;
-					}
+					JObject json = JObject.Parse(result.Content);
+					return json.Value<string>("result");
 				}
 			});
 		}
@@ -210,15 +206,19 @@ namespace HAtxLib {
 				}
 				try {
 					using (var socket = HSocket.Create(_url)) {
-						string data = socket.Post("/jsonrpc/0", json);
+						var result = socket.HttpPost("/jsonrpc/0", json);
+						//string data = socket.PostData("/jsonrpc/0", json);
 						if (_debug) {
-							Console.WriteLine($"JsonRpc <<< {data}");
+							Console.WriteLine($"JsonRpc <<< {result?.Content}");
 						}
-						if (string.IsNullOrWhiteSpace(data)) {
+						if (result == null) {
 							return null;
 						}
-						JsonRpcResponse result = JsonConvert.DeserializeObject<JsonRpcResponse>(data);
-						return result;
+						if (string.IsNullOrWhiteSpace(result.Content)) {
+							return null;
+						}
+						//JsonRpcResponse result = ;
+						return JsonConvert.DeserializeObject<JsonRpcResponse>(result.Content);
 					}
 				} catch (Exception) {
 					return null;
@@ -370,19 +370,12 @@ namespace HAtxLib {
 					return false;
 				}
 				using (HSocket socket = HSocket.Create("127.0.0.1", port)) {
-					string data = socket.Get("/version");
-					return string.IsNullOrWhiteSpace(data);
+					var result = socket.HttpGet("/version");
+					if (result == null || result.Code != 200) {
+						return false;
+					}
+					return true;
                 }
-				//	string url = $"http://127.0.0.1:{port}/version";
-				//HttpWebResponse response = HApi.Get(url);
-				//if (response == null) {
-				//	return false;
-				//}
-				//string data = response.DecodeDefault();
-				//if (string.IsNullOrWhiteSpace(data)) {
-				//	return false;
-				//}
-				//return true;
 			}
 
 

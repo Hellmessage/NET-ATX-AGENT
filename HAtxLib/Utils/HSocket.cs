@@ -3,8 +3,10 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Sockets;
 using System.Text;
+
 namespace HAtxLib.Utils {
 	public class HSocket : IDisposable {
 		private readonly Socket _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -38,72 +40,64 @@ namespace HAtxLib.Utils {
 
 		public HSocket(int port) : this("127.0.0.1", port){}
 
-		public string Get(string path) {
-			string raw = $"GET {path} HTTP/1.1\r\n" +
-				"User-Agent: Hell\r\n" +
-				"Accept: */*\r\n" +
-				$"Host: {_host}:{_port}\r\n" +
-				"Connection: close\r\n\r\n";
-			byte[] bytes = Encoding.UTF8.GetBytes(raw);
-			_socket.Send(bytes);
-			byte[] header = ReadEndWith("\r\n\r\n");
-			raw = Encoding.UTF8.GetString(header).ToLower();
-			var headers = raw.Split(new string[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries);
-			int length = -1;
-			foreach (string line in headers) {
-				if (line.StartsWith("content-length: ")) {
-					length = int.Parse(line.Split(':')[1].Replace(" ", ""));
+
+		private readonly static string[] HttpIgnoreKeys = new string[] { "user-agent", "host", "content-length" };
+
+		public HttpResult HttpRequest(string method, string path, Dictionary<string, object> header = null, string data = null) {
+			var keys = new List<string>();
+			StringBuilder sb = new StringBuilder($"{method} {path} HTTP/1.1\r\n");
+			if (header != null) {
+				foreach (var kv in header) {
+					string key = kv.Key.ToLower();
+					if (HttpIgnoreKeys.Contains(key)) {
+						continue;
+					}
+					if (keys.Contains(key)) {
+						continue;
+					}
+					keys.Add(key);
+					sb.Append($"{kv.Key}: {kv.Value}\r\n");
 				}
 			}
-			return (length > 0 ? Encoding.UTF8.GetString(ReadLength(length)) : ReadToClose()).Strip();
+			sb.Append($"User-Agent: Hell\r\n");
+			sb.Append($"Host: {_host}:{_port}\r\n");
+			if (!keys.Contains("connection")) {
+				sb.Append($"Connection: close\r\n");
+			}
+			if (!keys.Contains("accept")) {
+				sb.Append($"Accept: */*\r\n");
+			}
+			if (data != null) {
+				sb.Append($"Content-Length: {Encoding.UTF8.GetBytes(data).Length}\r\n\r\n");
+				sb.Append(data);
+			} else {
+				sb.Append("\r\n");
+			}
+			string raw = sb.ToString();
+			byte[] bytes = Encoding.UTF8.GetBytes(raw);
+			_socket.Send(bytes);
+			byte[] headerBuffer = ReadEndWith("\r\n\r\n");
+			raw = Encoding.UTF8.GetString(headerBuffer).ToLower();
+			var result = HttpResult.Create(raw);
+			result.SetContent((result.ContentLength > 0 ? Encoding.UTF8.GetString(ReadLength(result.ContentLength)) : result.ContentLength == -1 ? ReadToClose() : "").Strip());
+			return result;
 		}
 
-		public string Delete(string path) {
-			string raw = $"DELETE {path} HTTP/1.1\r\n" +
-				"User-Agent: Hell\r\n" +
-				"Accept: */*\r\n" +
-				$"Host: {_host}:{_port}\r\n" +
-				"Connection: close\r\n\r\n";
-			byte[] bytes = Encoding.UTF8.GetBytes(raw);
-			_socket.Send(bytes);
-			byte[] header = ReadEndWith("\r\n\r\n");
-			raw = Encoding.UTF8.GetString(header).ToLower();
-			var headers = raw.Split(new string[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries);
-			int length = -1;
-			foreach (string line in headers) {
-				if (line.StartsWith("content-length: ")) {
-					length = int.Parse(line.Split(':')[1].Replace(" ", ""));
-				}
-			}
-            return (length > 0 ? Encoding.UTF8.GetString(ReadLength(length)) : ReadToClose()).Strip();
-        }
+		public HttpResult HttpGet(string path) {
+			return HttpRequest("GET", path);
+		}
 
-		public string Post(string path, JObject json) {
+		public HttpResult HttpDelete(string path) {
+			return HttpRequest("DELETE", path);
+		}
+
+		public HttpResult HttpPost(string path, JObject json) {
 			string postdata = "";
 			if (json != null) {
 				postdata = json.ToString(Newtonsoft.Json.Formatting.None);
 			}
-			string raw = $"POST {path} HTTP/1.1\r\n" +
-				"User-Agent: Hell\r\n" +
-				"Content-Type: application/json; charset=UTF-8\r\n" +
-				"Accept: */*\r\n" +
-				$"Host: {_host}:{_port}\r\n" +
-				"Connection: close\r\n" +
-				$"Content-Length: {Encoding.UTF8.GetBytes(postdata).Length}\r\n\r\n" +
-				$"{postdata}";
-			byte[] bytes = Encoding.UTF8.GetBytes(raw);
-			_socket.Send(bytes);
-			byte[] header = ReadEndWith("\r\n\r\n");
-			raw = Encoding.UTF8.GetString(header).ToLower();
-			var headers = raw.Split(new string[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries);
-			int length = -1;
-			foreach (string line in headers) {
-				if (line.StartsWith("content-length: ")) {
-					length = int.Parse(line.Split(':')[1].Replace(" ", ""));
-				}
-			}
-            return (length > 0 ? Encoding.UTF8.GetString(ReadLength(length)) : ReadToClose()).Strip();
-        }
+			return HttpRequest("POST", path, new Dictionary<string, object>() { { "Content-Type", "application/json; charset=UTF-8" } }, postdata.Strip());
+		}
 
 		private string ReadToClose() {
 			using (MemoryStream stream = new MemoryStream()) {
@@ -165,6 +159,45 @@ namespace HAtxLib.Utils {
 		public void Dispose() {
 			_socket.Close();
 			_socket?.Dispose();
+		}
+	}
+
+	public class HttpResult {
+		public int Code { get; private set; } = -1;
+		public string Header { get; private set; } = null;
+		public string Content { get; private set; } = null;
+		public int ContentLength { get; private set; } = -1;
+
+		public readonly Dictionary<string, string> Headers = new Dictionary<string, string>();
+
+		private HttpResult() { }
+
+		internal static HttpResult Create(string raw) {
+			var result = new HttpResult() {
+				Header = raw
+			};
+			string[] sp = raw.Split(new string[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries);
+			foreach (string line in sp) {
+				if (!line.Contains(": ")) {
+					string[] ls = line.Split(' ');
+					if (ls.Length > 0) {
+						result.Code = int.Parse(ls[1]);
+					}
+				} else {
+					string[] ls = line.Split(new string[] { ": " }, StringSplitOptions.None);
+					if (ls.Length > 1) {
+						result.Headers.Add(ls[0], ls[1]);
+						if (ls[0] == "content-length") {
+							result.ContentLength = int.Parse(ls[1]);
+						}
+					}
+				}
+			}
+			return result;
+		}
+
+		internal void SetContent(string content) {
+			Content = content;
 		}
 	}
 }
