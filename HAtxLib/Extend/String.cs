@@ -1,24 +1,24 @@
 ﻿using System.Linq;
 
 namespace HAtxLib.Extend {
-    public static class String {
-        internal static string Strip(this string s) {
-            if (string.IsNullOrWhiteSpace(s)) {
-                return "";
-            }
-            while (s.EndsWith("\r\n")) {
-                s = s.Substring(0, s.Length - 2);
-            }
-            while (s.EndsWith("\n")) {
-                s = s.Substring(0, s.Length - 1);
-            }
-            while (s.EndsWith("\r")) {
-                s = s.Substring(0, s.Length - 1);
-            }
-            return s.Trim().TrimStart().TrimEnd();
-        }
+	public static class String {
+		internal static string Strip(this string s) {
+			if (string.IsNullOrWhiteSpace(s)) {
+				return "";
+			}
+			while (s.EndsWith("\r\n")) {
+				s = s.Substring(0, s.Length - 2);
+			}
+			while (s.EndsWith("\n")) {
+				s = s.Substring(0, s.Length - 1);
+			}
+			while (s.EndsWith("\r")) {
+				s = s.Substring(0, s.Length - 1);
+			}
+			return s.Trim().TrimStart().TrimEnd();
+		}
 
-        internal static string Unicode(this string str) {
+		internal static string Unicode(this string str) {
 			string result = string.Concat(str.Select(c => IsChinese(c) ? "\\u" + ((int)c).ToString("X4") : c.ToString()));
 			return result;
 		}

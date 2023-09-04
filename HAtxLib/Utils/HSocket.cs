@@ -1,12 +1,11 @@
-﻿using HAtxLib.Extend;
-using Newtonsoft.Json.Linq;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
+using HAtxLib.Extend;
+using Newtonsoft.Json.Linq;
 
 namespace HAtxLib.Utils {
 	public class HSocket : IDisposable {
@@ -39,7 +38,7 @@ namespace HAtxLib.Utils {
 			_socket.Connect(_host, _port);
 		}
 
-		public HSocket(int port) : this("127.0.0.1", port){}
+		public HSocket(int port) : this("127.0.0.1", port) { }
 
 		#region HTTP请求
 

@@ -3,7 +3,7 @@ using Newtonsoft.Json.Linq;
 using System;
 
 namespace HAtxLib.UIAutomator {
-    internal class UIAutomatorService {
+	internal class UIAutomatorService {
 		private readonly static string SERVICE_NAME = "uiautomator";
 		private readonly static string _path = $"/services/{SERVICE_NAME}";
 		private readonly string _url;
@@ -24,14 +24,14 @@ namespace HAtxLib.UIAutomator {
 		}
 
 		public bool Stop() {
-            using (HSocket socket = HSocket.Create(_url)) {
+			using (HSocket socket = HSocket.Create(_url)) {
 				var result = socket.HttpDelete(_path);
 				Console.WriteLine($"Stop: {result.Content}");
 				if (result == null || result.Code != 200) {
 					return false;
 				}
-                return true;
-            }
+				return true;
+			}
 		}
 
 		public bool Running() {
