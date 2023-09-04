@@ -1,12 +1,14 @@
-﻿using HAtxLib.Extend;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Text;
+using System.Xml;
 
 namespace HAtxLib.UIAutomator {
 
 	public enum ByMask {
+		Xpath = 0,
 		Text = 0x01,
 		TextContains = 0x02,
 		TextMatches = 0x04,
@@ -31,7 +33,7 @@ namespace HAtxLib.UIAutomator {
 		ResourceId = 0x200000,
 		ResourceIdMatches = 0x400000,
 		Index = 0x800000,
-		Instance = 0x01000000
+		Instance = 0x01000000,
 	}
 
 	public class By : JObject {
@@ -64,11 +66,12 @@ namespace HAtxLib.UIAutomator {
 		};
 		private const string DefaultEncoding = "ISO-8859-1";
 		public static Encoding Encoding { get; } = Encoding.GetEncoding(DefaultEncoding);
-		private ByMask Mask { get; set; }
+		public ByMask Mask { get; private set; }
 		private string Value { get; set; }
 		private JArray ChildOrSibling { get; set; } = new JArray();
 		private JArray ChildOrSiblingSelector { get; set; } = new JArray();
 		private By[] SubBy { get; set; } = new By[0];
+		public Point Pos { get; private set; } = Point.Empty;
 
 		private By() {}
 
@@ -81,7 +84,7 @@ namespace HAtxLib.UIAutomator {
 		}
 
 		public override string ToString() {
-			return ToJson().ToString(Formatting.None);
+			return ToJson().ToString(Newtonsoft.Json.Formatting.None);
 		}
 
 		public JObject ToJson() {
@@ -111,12 +114,45 @@ namespace HAtxLib.UIAutomator {
 			return Create(ByMask.Description, value);
 		}
 
+		public static By Xpath(string value) {
+			return Create(ByMask.Xpath, value);
+		}
+
+		public bool XpathToAndroid(string xml) {
+			if (Mask == ByMask.Xpath) {
+				try {
+					XmlDocument doc = new XmlDocument();
+					doc.LoadXml(xml);
+					var data = doc.SelectNodes(Value);
+					if (data != null) {
+						var element = data[0];
+						if (element != null) {
+							var value = element.Attributes["bounds"].Value;
+							var sp = value.Split(new string[] { "][" }, StringSplitOptions.None);
+							var tl = sp[0].Substring(1).Split(',');
+							var br = sp[1].Substring(0, sp[1].Length - 1).Split(',');
+							int tx = int.Parse(tl[0]);
+							int ty = int.Parse(tl[1]);
+							int bx = int.Parse(br[0]);
+							int by = int.Parse(br[1]);
+							int cx = (bx - tx) / 2;
+							int cy = (by - ty) / 2;
+							Pos = new Point(cx + tx, cy + ty);
+							return true;
+						}
+					}
+					return false;
+				} catch (Exception) {
+					return false;
+				}
+			}
+			return false;
+		}
+
 		internal class ByItem {
 			public string Name { get; set; }
 			public int Mask { get; set; }
 			public object Flag { get; set; }
 		} 
 	}
-
-	
 }

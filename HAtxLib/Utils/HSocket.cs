@@ -40,6 +40,7 @@ namespace HAtxLib.Utils {
 
 		public HSocket(int port) : this("127.0.0.1", port){}
 
+		#region HTTP请求
 
 		private readonly static string[] HttpIgnoreKeys = new string[] { "user-agent", "host", "content-length" };
 
@@ -98,6 +99,8 @@ namespace HAtxLib.Utils {
 			}
 			return HttpRequest("POST", path, new Dictionary<string, object>() { { "Content-Type", "application/json; charset=UTF-8" } }, postdata.Strip());
 		}
+
+		#endregion
 
 		private string ReadToClose() {
 			using (MemoryStream stream = new MemoryStream()) {
@@ -164,8 +167,11 @@ namespace HAtxLib.Utils {
 
 	public class HttpResult {
 		public int Code { get; private set; } = -1;
+
 		public string Header { get; private set; } = null;
+
 		public string Content { get; private set; } = null;
+
 		public int ContentLength { get; private set; } = -1;
 
 		public readonly Dictionary<string, string> Headers = new Dictionary<string, string>();

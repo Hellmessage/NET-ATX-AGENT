@@ -1,5 +1,6 @@
 ﻿using HAtxLib.Utils;
 using Newtonsoft.Json.Linq;
+using System;
 
 namespace HAtxLib.UIAutomator {
     internal class UIAutomatorService {
@@ -13,14 +14,11 @@ namespace HAtxLib.UIAutomator {
 
 		public bool Start() {
 			using (HSocket socket = HSocket.Create(_url)) {
-				var result = socket.HttpDelete(_path);
+				var result = socket.HttpPost(_path, null);
+				Console.WriteLine($"Start: {result.Content}");
 				if (result == null || result.Code != 200) {
 					return false;
 				}
-				//string data = socket.PostData(_path, null);
-				//if (data == null) {
-				//	return false;
-				//}
 				return true;
 			}
 		}
@@ -28,6 +26,7 @@ namespace HAtxLib.UIAutomator {
 		public bool Stop() {
             using (HSocket socket = HSocket.Create(_url)) {
 				var result = socket.HttpDelete(_path);
+				Console.WriteLine($"Stop: {result.Content}");
 				if (result == null || result.Code != 200) {
 					return false;
 				}
@@ -38,6 +37,7 @@ namespace HAtxLib.UIAutomator {
 		public bool Running() {
 			using (HSocket socket = HSocket.Create(_url)) {
 				var result = socket.HttpGet(_path);
+				Console.WriteLine($"Running: {result.Content}");
 				if (result == null || result.Code != 200) {
 					return false;
 				}

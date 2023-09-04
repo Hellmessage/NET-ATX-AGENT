@@ -39,6 +39,7 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
     <Reference Include="System.Numerics" />
     <Reference Include="System.Web" />
     <Reference Include="System.Xml.Linq" />
@@ -59,6 +60,7 @@
     <Compile Include="ADB\Entity\AndroidAppInfo.cs" />
     <Compile Include="ADB\Entity\AndroidProcessItem.cs" />
     <Compile Include="ADB\Entity\ForwardItem.cs" />
+    <Compile Include="Catch\ATXElementException.cs" />
     <Compile Include="Catch\ATXException.cs" />
     <Compile Include="Catch\ATXIniterException.cs" />
     <Compile Include="Extend\String.cs" />

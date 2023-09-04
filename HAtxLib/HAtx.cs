@@ -19,6 +19,8 @@ namespace HAtxLib {
 		private int _port = -1;
 		private string _url = null;
 		private bool _debug = false;
+
+		public int ElementMaxWaitTime { get; set; } = 2000; 
 		public string AtxAgentUrl {
 			get {
 				if (string.IsNullOrWhiteSpace(_url)) {
@@ -49,10 +51,16 @@ namespace HAtxLib {
 			_serial = serial;
 			_client = new ADBClient(_serial);
 			Initer initer = new Initer(_client);
-			initer.Install();
+			while (true) {
+				try {
+					initer.Install();
+					break;
+				} catch (Exception) {
+					continue;
+				}
+			}
 			Console.WriteLine($"HAtx<{_serial}> Connect: {Connect()}");
 			HRuntime.Run("运行 UIAUTOMATOR", () => Console.WriteLine($"HAtx<{_serial}> RunUiautomator: {RunUiautomator()}"));
-			//_client.Shell("am", "start", "-W", "-n", "com.github.uiautomator/.IdentifyActivity", "-e", "theme", "black");
 		}
 
 		public void SetDebug() {
@@ -69,11 +77,20 @@ namespace HAtxLib {
 			return true;
 		}
 
-        #region DUMP屏幕
-        /// <summary>
-        /// DUMP屏幕
-        /// </summary>
-        public string DumpHierarchy() {
+		#region 手机显示信息页面
+		/// <summary>
+		/// 手机显示信息页面
+		/// </summary>
+		public void ShowInfo() {
+			_client.Shell("am", "start", "-W", "-n", "com.github.uiautomator/.IdentifyActivity", "-e", "theme", "black");
+		}
+		#endregion
+
+		#region DUMP屏幕
+		/// <summary>
+		/// DUMP屏幕
+		/// </summary>
+		public string DumpHierarchy() {
 			return HRuntime.Run("屏幕DUMP", () => {
 				using (HSocket socket = HSocket.Create(_url)) {
 					var result = socket.HttpGet("/dump/hierarchy");
@@ -85,13 +102,28 @@ namespace HAtxLib {
 				}
 			});
 		}
-        #endregion
 
-        #region 设备信息
-        /// <summary>
-        /// 设备信息
-        /// </summary>
-        public UADeviceInfo DeviceInfo() {
+		/// <summary>
+		/// DUMP屏幕(DumpWindowHierarchy)
+		/// </summary>
+		public string DumpWindowHierarchy(bool compressed = false) {
+			var result = JsonRpc("dumpWindowHierarchy", compressed, null);
+			if (result == null || result.Data == null) {
+				return null;
+			}
+			if (result.Data is string xml) {
+				return xml;
+			}
+			return null;
+		}
+
+		#endregion
+
+		#region 设备信息
+		/// <summary>
+		/// 设备信息
+		/// </summary>
+		public UADeviceInfo DeviceInfo() {
 			var json = JsonRpc("deviceInfo");
 			if (json == null) {
 				return null;
@@ -147,27 +179,53 @@ namespace HAtxLib {
 		/// 检测元素是否存在
 		/// </summary>
 		/// <exception cref="ATXException"></exception>
-        public bool ElementExists(By by, int wait = 2000) {
-			var result = JsonRpc("waitForExists", by, wait);
-			if (result == null) {
-				throw new ATXException("ElementExists Fail");
+        public bool ElementExists(By by, int wait = -1) {
+			if (wait == -1) {
+				wait = ElementMaxWaitTime;
 			}
+			if (by.Mask == ByMask.Xpath) {
+				return by.XpathToAndroid(DumpHierarchy());
+			}
+			var result = JsonRpc("waitForExists", by, wait) ?? throw new ATXException("ElementExists Fail");
 			if (result.Error != null) {
 				throw new ATXException($"ElementExists Fail {result.Error.ToString(Formatting.None)}");
 			}
-			if (result.Data is bool) {
-				return (bool)result.Data;
-			} else {
+			return result.Data is bool v && v;
+		}
+		#endregion
+
+		#region 元素点击
+
+		public bool Click(By by, int wait = -1) {
+			if (wait == -1) {
+				wait = ElementMaxWaitTime;
+			}
+			if (ElementExists(by, wait)) {
+				if (by.Mask == ByMask.Xpath) {
+					return Click(by.Pos.X, by.Pos.Y);
+				}
+			}
+			return false;
+		}
+
+		public bool Click(params int[] pos) {
+			var result = JsonRpc("click", pos);
+			if (result == null) {
 				return false;
 			}
+			if (result.Error != null) {
+				throw new ATXElementException(result.Error.ToString());
+			}
+			return result.Data is bool s && s;
 		}
-        #endregion
 
-        #region 按钮点击
+		#endregion
+
+		#region 按下按钮
 		/// <summary>
 		/// 按下按钮
 		/// </summary>
-        public void Press(string key) {
+		public void Press(string key) {
             JsonRpc("pressKey", key);
         }
 
@@ -207,7 +265,6 @@ namespace HAtxLib {
 				try {
 					using (var socket = HSocket.Create(_url)) {
 						var result = socket.HttpPost("/jsonrpc/0", json);
-						//string data = socket.PostData("/jsonrpc/0", json);
 						if (_debug) {
 							Console.WriteLine($"JsonRpc <<< {result?.Content}");
 						}
@@ -217,7 +274,6 @@ namespace HAtxLib {
 						if (string.IsNullOrWhiteSpace(result.Content)) {
 							return null;
 						}
-						//JsonRpcResponse result = ;
 						return JsonConvert.DeserializeObject<JsonRpcResponse>(result.Content);
 					}
 				} catch (Exception) {
@@ -242,10 +298,14 @@ namespace HAtxLib {
 		}
 
 		private bool RunUiautomator(int timeout = 20) {
-            if (IsAlive() && UIService.Running()) {
+			bool service = UIService.Running();
+			if (IsAlive() && service) {
                 return true;
             }
-			Console.WriteLine($"Uiautomator Service Stop: {UIService.Stop()}");
+			if (service) {
+				Console.WriteLine($"Uiautomator Service Stop: {UIService.Stop()}");
+			}
+			Thread.Sleep(1000);
 			GrantAppPermissions();
 			var argv = new string[] {
 				"am",
