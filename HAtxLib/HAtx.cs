@@ -7,15 +7,13 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Threading;
-using System.Web.UI.WebControls.WebParts;
 
 namespace HAtxLib {
 
-	public class HAtx {
+    public class HAtx {
 		private readonly string _serial;
 		private readonly ADBClient _client;
 		private int _port = -1;
@@ -48,10 +46,6 @@ namespace HAtxLib {
 			get {
 				return new UIAutomatorService(this);
 			}
-		}
-
-		public void Test() {
-
 		}
 
 		public HAtx(string serial) {
@@ -108,11 +102,16 @@ namespace HAtxLib {
 		}
 
 		public bool IsAlive() {
-			var device = DeviceInfo();
-			if (device == null) {
-				return false;
-			}
-			return true;
+			int size = 10;
+			while (size-- > 0) {
+                var device = DeviceInfo();
+                if (device == null) {
+					Thread.Sleep(500);
+					continue;
+                }
+                return true;
+            }
+			return false;
 		}
 
 		public void SetOrientation(Orientation orientation) {
@@ -194,12 +193,9 @@ namespace HAtxLib {
 		}
 
 		private bool RunUiautomator(int timeout = 20) {
-			//if (IsAlive()) {
-			//	return true;
-			//}
-			if (UIService.Running()) {
-				return true;
-			}
+            if (IsAlive() && UIService.Running()) {
+                return true;
+            }
 			Console.WriteLine($"Uiautomator Service Stop: {UIService.Stop()}");
 			GrantAppPermissions();
 			var argv = new string[] {
@@ -349,8 +345,7 @@ namespace HAtxLib {
 						return true;
 					}
 					return int.Parse(ov[2]) < int.Parse(nv[2]);
-				} catch (Exception ex) {
-					Console.WriteLine($"123 {ex}");
+				} catch (Exception) {
 					return true;
 				}
 			}
@@ -367,11 +362,12 @@ namespace HAtxLib {
 						string url = $"{GITHUB_BASEURL}{GITHUB_DOWN_APK_PATH}{ATX_APP_VERSION}/{app}.apk";
 						string file = $"{CACHE_PATH}apk/{ATX_APP_VERSION}/{app}.apk";
 						GithubDown(url, file);
-						Console.WriteLine($"{tmp}: {_client.Push(file, tmp, 420/*644*/)}");
-						Console.WriteLine($"{tmp} Install: {_client.Shell("pm", "install", "-r", "-t", tmp)}");
-					}
+						_client.Push(file, tmp, 420/*644*/);
+						_client.Shell("pm", "install", "-r", "-t", tmp);
+                        //Console.WriteLine($"{tmp}: {_client.Push(file, tmp, 420/*644*/)}");
+                        //Console.WriteLine($"{tmp} Install: {_client.Shell("pm", "install", "-r", "-t", tmp)}");
+                    }
 				}
-
 			}
 
 			public bool IsAtxAppOutdated() {
@@ -407,18 +403,21 @@ namespace HAtxLib {
 				string minicap_file = $"{CACHE_PATH}minicap/{_abi}/minicap";
 				GithubDown(so_url, so_file);
 				GithubDown(minicap_url, minicap_file);
-				Console.WriteLine($"{ANDROID_LOCAL_TMP_PATH}minicap: {_client.Push(minicap_file, $"{ANDROID_LOCAL_TMP_PATH}minicap")}");
-				Console.WriteLine($"{ANDROID_LOCAL_TMP_PATH}minicap.so: {_client.Push(so_file, $"{ANDROID_LOCAL_TMP_PATH}minicap.so")}");
-			}
-			#endregion
+                _client.Push(minicap_file, $"{ANDROID_LOCAL_TMP_PATH}minicap");
+				_client.Push(so_file, $"{ANDROID_LOCAL_TMP_PATH}minicap.so");
+                //Console.WriteLine($"{ANDROID_LOCAL_TMP_PATH}minicap: {_client.Push(minicap_file, $"{ANDROID_LOCAL_TMP_PATH}minicap")}");
+                //Console.WriteLine($"{ANDROID_LOCAL_TMP_PATH}minicap.so: {_client.Push(so_file, $"{ANDROID_LOCAL_TMP_PATH}minicap.so")}");
+            }
+            #endregion
 
-			#region minitouch
-			public void SetupMinitouch() {
+            #region minitouch
+            public void SetupMinitouch() {
 				string base_url = $"{GITHUB_BASEURL}/stf-binaries/raw/0.3.0/node_modules/@devicefarmer/minitouch-prebuilt/prebuilt/{_abi}/bin/minitouch";
 				string minitouch_file = $"{CACHE_PATH}minitouch/{_abi}/minitouch";
 				GithubDown(base_url, minitouch_file);
-				Console.WriteLine($"{ANDROID_LOCAL_TMP_PATH}minitouch: {_client.Push(minitouch_file, $"{ANDROID_LOCAL_TMP_PATH}minitouch")}");
-			}
+				_client.Push(minitouch_file, $"{ANDROID_LOCAL_TMP_PATH}minitouch");
+                //Console.WriteLine($"{ANDROID_LOCAL_TMP_PATH}minitouch: {_client.Push(minitouch_file, $"{ANDROID_LOCAL_TMP_PATH}minitouch")}");
+            }
 			#endregion
 
 			#region 安装/卸载/重装

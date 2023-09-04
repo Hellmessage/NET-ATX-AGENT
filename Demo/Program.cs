@@ -12,19 +12,18 @@ namespace Demo {
 	internal class Program {
 		static void Main(string[] args) {
 
-			HAtx atx = new HAtx("98897a394f41334c4c");
+			HAtx atx = new HAtx("988a9b38514c453750");
 			atx.SetDebug();
-			atx.Test();
 			//Console.WriteLine(atx.DumpHierarchy());
 			Console.WriteLine(atx.AtxAgentUrl);
-			var data = HRuntime.Run("测试 SOCKET", () => {
-				HSocket socket = HSocket.Create(atx.AtxAgentUrl);
-				JObject json = JObject.Parse("{\"jsonrpc\":\"2.0\",\"id\":\"fefb22f3a51249b587de33696bd1f317\",\"method\":\"waitForExists\",\"params\":[{\"childOrSibling\":[],\"childOrSiblingSelector\":[],\"resourceId\":\"com.android.systemui:id/home\",\"mask\":2097152},0]}");
-				return socket.Get("/services/uiautomator");
-			});
-			Console.WriteLine(data);
-			Console.WriteLine($"EEEE {atx.ElementExists(By.ResourceId("com.android.systemui:id/home"), 1000)}");
-			Console.WriteLine($"EEEE {atx.ElementExists(By.Text("Chrome"), 1000)}");
+			//var data = HRuntime.Run("测试 SOCKET", () => {
+			//	HSocket socket = HSocket.Create(atx.AtxAgentUrl);
+			//	JObject json = JObject.Parse("{\"jsonrpc\":\"2.0\",\"id\":\"fefb22f3a51249b587de33696bd1f317\",\"method\":\"waitForExists\",\"params\":[{\"childOrSibling\":[],\"childOrSiblingSelector\":[],\"resourceId\":\"com.android.systemui:id/home\",\"mask\":2097152},0]}");
+			//	return socket.Get("/services/uiautomator");
+			//});
+			//Console.WriteLine(data);
+			//Console.WriteLine($"EEEE {atx.ElementExists(By.ResourceId("com.android.systemui:id/home"), 1000)}");
+			//Console.WriteLine($"EEEE {atx.ElementExists(By.Text("Chrome"), 1000)}");
 
 			Thread.Sleep(1000);
 			//watch.Stop();

@@ -68,6 +68,7 @@
     <Compile Include="UIAutomator\Model\UADeviceInfo.cs" />
     <Compile Include="UIAutomator\UIAutomatorService.cs" />
     <Compile Include="Utils\HApi.cs" />
+    <Compile Include="Utils\HLog.cs" />
     <Compile Include="Utils\HProcess.cs" />
     <Compile Include="Utils\HSocket.cs" />
     <Compile Include="Utils\HZip.cs" />
