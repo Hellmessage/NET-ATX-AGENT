@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Dynamic;
 using System.Linq;
 using System.Text;
@@ -7,6 +8,7 @@ using System.Threading.Tasks;
 
 namespace HAtxLib.Utils {
 	internal class HLog {
+		private readonly static object _lock = new object();
 		private string _class;
 		private string _name;
 
@@ -20,10 +22,63 @@ namespace HAtxLib.Utils {
 		private HLog() {}
 
 
+		public void Info(string format, params object[] argv) {
+			Log(LogLevel.Info, format, argv);
+		}
 
-		public void WriteLine(string type, string method, string format, params object[] argv) {
-			string str = string.Format(format, argv);
-			Console.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{_class} - {_name}] <{type}> {method}() --- {str}");
+		public void Debug(string format, params object[] argv) {
+			Log(LogLevel.Debug, format, argv);
+		}
+
+		public void Warn(string format, params object[] argv) {
+			Log(LogLevel.Warn, format, argv);
+		}
+
+		private void Log(LogLevel level, string format, params object[] argv) {
+			StackTrace st = new StackTrace(true);
+			StackFrame sf = st.GetFrame(2);
+			WriteLine(level, sf.GetMethod().Name, format, argv);
+		}
+
+		public void WriteLine(LogLevel level, string method, string format, params object[] argv) {
+			lock(_lock) {
+				string str = format;
+				if (argv.Length > 0) {
+					str = string.Format(str, argv);
+				}
+				Console.ForegroundColor = GetConsoleColor(level);
+				Console.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{_class}-{_name}] <{level}> {method}() --- {str}");
+				Console.ResetColor();
+			}
+		}
+
+		private static ConsoleColor GetConsoleColor(LogLevel level) {
+			switch (level) {
+				case LogLevel.Debug:
+					return ConsoleColor.Magenta;
+				case LogLevel.Info:
+					return ConsoleColor.White;
+				case LogLevel.Warn:
+					return ConsoleColor.Yellow;
+				case LogLevel.Error:
+					return ConsoleColor.Red;
+				case LogLevel.Remind:
+					return ConsoleColor.Green;
+			}
+			return ConsoleColor.Gray;
+		}
+
+		
+
+		public enum LogLevel {
+			None = 0,
+			Debug = 1,
+			Info = 2,
+			Error = 3,
+			Warn = 4,
+			Remind = 5
 		}
 	}
+
+
 }

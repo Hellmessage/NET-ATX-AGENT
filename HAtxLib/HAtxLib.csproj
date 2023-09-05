@@ -60,7 +60,7 @@
     <Compile Include="ADB\Entity\AndroidAppInfo.cs" />
     <Compile Include="ADB\Entity\AndroidProcessItem.cs" />
     <Compile Include="ADB\Entity\ForwardItem.cs" />
-    <Compile Include="Catch\ATXElementException.cs" />
+    <Compile Include="Catch\ATXNodeException.cs" />
     <Compile Include="Catch\ATXException.cs" />
     <Compile Include="Catch\ATXIniterException.cs" />
     <Compile Include="Extend\String.cs" />
@@ -76,6 +76,7 @@
     <Compile Include="Utils\HZip.cs" />
     <Compile Include="Utils\HRuntime.cs" />
     <Compile Include="UIAutomator\Model\JsonRpcResponse.cs" />
+    <Compile Include="UIAutomator\UINode.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

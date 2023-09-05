@@ -1,5 +1,6 @@
 ﻿using HAtxLib.ADB;
 using HAtxLib.Catch;
+using HAtxLib.Extend;
 using HAtxLib.UIAutomator;
 using HAtxLib.UIAutomator.Model;
 using HAtxLib.Utils;
@@ -7,25 +8,49 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
 using System.Net;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace HAtxLib {
 
 	public class HAtx {
+		private readonly static HLog Log = HLog.Get<HAtx>("核心");
 		private readonly string _serial;
 		private readonly ADBClient _client;
 		private int _port = -1;
 		private string _url = null;
 		private bool _debug = false;
 
-		public int ElementMaxWaitTime { get; set; } = 2000;
-		// 检测中延时
-		public int ElementClickExistDelay { get; set; } = 60;
-		// 点击是延迟
-		public int ElementClickDelay { get; set; } = 200;
+		#region 全局设置
 
+		public int UINodeMaxWaitTime { get; set; } = 2000;
+		// 检测中延时
+		public int UINodeClickExistDelay { get; set; } = 60;
+		// 点击是延迟
+		public int UINodeClickDelay { get; set; } = 100;
+
+		#endregion
+
+		public HAtx(string serial) {
+			_serial = serial;
+			_client = new ADBClient(_serial);
+			Initer initer = new Initer(_client);
+			while (true) {
+				try {
+					initer.Install();
+					break;
+				} catch (Exception) {
+					continue;
+				}
+			}
+			Console.WriteLine($"HAtx<{_serial}> Connect: {Connect()}");
+			HRuntime.Run("运行 UIAUTOMATOR", () => Console.WriteLine($"HAtx<{_serial}> RunUiautomator: {RunUiautomator()}"));
+		}
+
+		#region 连接
 		public string AtxAgentUrl {
 			get {
 				if (string.IsNullOrWhiteSpace(_url)) {
@@ -46,31 +71,6 @@ namespace HAtxLib {
 				return $"ws://127.0.0.1:{_port}";
 			}
 		}
-		private UIAutomatorService UIService {
-			get {
-				return new UIAutomatorService(this);
-			}
-		}
-
-		public HAtx(string serial) {
-			_serial = serial;
-			_client = new ADBClient(_serial);
-			Initer initer = new Initer(_client);
-			while (true) {
-				try {
-					initer.Install();
-					break;
-				} catch (Exception) {
-					continue;
-				}
-			}
-			Console.WriteLine($"HAtx<{_serial}> Connect: {Connect()}");
-			HRuntime.Run("运行 UIAUTOMATOR", () => Console.WriteLine($"HAtx<{_serial}> RunUiautomator: {RunUiautomator()}"));
-		}
-
-		public void SetDebug() {
-			_debug = true;
-		}
 
 		private bool Connect() {
 			int port = _client.ForwardPort(7912);
@@ -81,6 +81,21 @@ namespace HAtxLib {
 			_url = $"http://127.0.0.1:{port}";
 			return true;
 		}
+		#endregion
+
+		#region UI服务
+		private UIAutomatorService UIService {
+			get {
+				return new UIAutomatorService(this);
+			}
+		}
+		#endregion
+
+		#region 设置DEBUG
+		public void SetDebug() {
+			_debug = true;
+		}
+		#endregion
 
 		#region 手机显示信息页面
 		/// <summary>
@@ -140,6 +155,16 @@ namespace HAtxLib {
 			JObject data = (JObject)json.Data;
 			return JsonConvert.DeserializeObject<UADeviceInfo>(data.ToString());
 		}
+
+		public AtxDeviceInfo Info() {
+			using (HSocket socket = HSocket.Create(_url)) {
+				var result = socket.HttpGet("/info");
+				if (result.Code == 200) {
+					return JsonConvert.DeserializeObject<AtxDeviceInfo>(result.Content);
+				}
+			}
+			return null;
+		}
 		#endregion
 
 		#region 是否在线
@@ -160,6 +185,30 @@ namespace HAtxLib {
 		}
 		#endregion
 
+		#region 屏幕相关
+
+		private readonly static Regex DumpsysDisplayScreenRegex = new Regex(".*DisplayViewport\\{.*?orientation=(?<orientation>.*?),.*?deviceWidth=(?<width>.*?),.*deviceHeight=(?<height>.*?)\\}");
+
+		#region 获取屏幕方向
+
+		/// <summary>
+		/// 获取屏幕方向
+		/// </summary>
+		/// <returns></returns>
+		public object[] GetOrientation() {
+			string result = _client.Shell("dumpsys", "display");
+			Match match = DumpsysDisplayScreenRegex.Match(result);
+			int o;
+			if (match.Success) {
+				o = int.Parse(match.Groups["orientation"].Value);
+			} else {
+				o = DeviceInfo().DisplayRotation;
+			}
+			return OrientationDict[(Orientation)o];
+		}
+
+		#endregion
+
 		#region 设置屏幕方向
 		/// <summary>
 		/// 设置屏幕方向
@@ -169,7 +218,7 @@ namespace HAtxLib {
 		}
 		#endregion
 
-		#region 锁定屏幕
+		#region 锁定屏幕方向
 		/// <summary>
 		/// 锁定屏幕方向 
 		/// True 自动 False 锁定
@@ -179,64 +228,133 @@ namespace HAtxLib {
 		}
 		#endregion
 
-		#region 判断元素是否存在
+		#region 获取分辨率
 		/// <summary>
-		/// 检测元素是否存在
+		/// 获取屏幕分辨率
 		/// </summary>
-		/// <exception cref="ATXException"></exception>
-		public bool ElementExists(By by, int wait = -1) {
-			if (wait == -1) {
-				wait = ElementMaxWaitTime;
-			}
-			if (by.Mask == ByMask.Xpath) {
-				string xml = DumpWindowHierarchy();
-				bool exist = by.XpathToAndroid(xml);
-				if (!exist) {
-					Thread.Sleep(ElementClickExistDelay);
-				}
-				return exist;
-			}
-			var result = JsonRpc("waitForExists", by, wait) ?? throw new ATXException("ElementExists Fail");
-			if (result.Error != null) {
-				throw new ATXElementException("ElementExists Fail", result.Error);
-			}
-			return result.Data is bool v && v;
+		/// <returns></returns>
+		public Size GetWindowSize() {
+			var info = Info();
+			return new Size(info.Display.Width, info.Display.Height);
 		}
 		#endregion
 
-		#region 元素点击
+		#region 息屏/亮屏
 
-		public bool Click(By by, int wait = -1) {
-			if (wait == -1) {
-				wait = ElementMaxWaitTime;
-			}
-			while (wait > 0) {
-				bool exist = HRuntime.Time(() => {
-					return ElementExists(by, 60);
-				}, out int time);
-				wait -= time;
-				if (exist) {
-					Thread.Sleep(ElementClickDelay);
-					if (by.Mask == ByMask.Xpath) {
-						by.XpathToAndroid(DumpWindowHierarchy());
-						return Click(by.Pos.X, by.Pos.Y);
-					}
-				}
-			}
-			return false;
+		/// <summary>
+		/// 亮屏
+		/// </summary>
+		public void ScreenOn() {
+			JsonRpc("wakeUp");
 		}
 
-		public bool Click(params int[] pos) {
-			var result = JsonRpc("click", pos);
+		/// <summary>
+		/// 息屏
+		/// </summary>
+		public void ScreenOff() {
+			JsonRpc("sleep");
+		}
+
+		#endregion
+
+		#endregion
+
+		#region 屏幕点击
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="pos"></param>
+		/// <returns></returns>
+		/// <exception cref="ATXNodeException"></exception>
+		public bool Click(float x, float y) {
+			var pos = Rel2Abs(x, y);
+			var result = JsonRpc("click", new int[] { pos.X, pos.Y });
 			if (result == null) {
 				return false;
 			}
 			if (result.Error != null) {
-				throw new ATXElementException("Click fail", result.Error);
+				throw new ATXNodeException("Click fail", result.Error);
 			}
 			return result.Data is bool s && s;
 		}
 
+		/// <summary>
+		/// 屏幕双击
+		/// </summary>
+		/// <param name="x">坐标X</param>
+		/// <param name="y">坐标Y</param>
+		/// <param name="wait">间隔</param>
+		/// <returns></returns>
+		public bool DoubleClick(float x, float y, int wait = 60) {
+			var pos = Rel2Abs(x, y);
+			AtxTouch.Down(this, pos.X, pos.Y).Up(pos.X, pos.Y);
+			Thread.Sleep(wait);
+			Click(x, y);
+			return false;
+		}
+
+		/// <summary>
+		/// 长按屏幕
+		/// </summary>
+		/// <param name="x"></param>
+		/// <param name="y"></param>
+		/// <param name="time"></param>
+		public void LoginClick(float x, float y, int time = 500) {
+			Thread.Sleep(UINodeClickExistDelay);
+			var pos = Rel2Abs(x, y);
+			AtxTouch.Down(this, pos.X, pos.Y).Wait(time).Up(pos.X, pos.Y);
+		}
+		#endregion
+
+		#region 屏幕滑动
+		/// <summary>
+		/// 滑动屏幕
+		/// </summary>
+		/// <param name="fx">起始X</param>
+		/// <param name="fy">起始Y</param>
+		/// <param name="lx">终点X</param>
+		/// <param name="ly">终点Y</param>
+		/// <param name="duration">持续时间</param>
+		/// <returns></returns>
+		public bool Swipe(float fx, float fy, float lx, float ly, int duration = 55) {
+			if (duration < 2) {
+				duration = 2;
+			}
+			duration *= 200;
+			var fpos = Rel2Abs(fx, fy);
+			var lpos = Rel2Abs(lx, ly);
+			var result = JsonRpc("swipe", fpos.X, fpos.Y, lpos.X, lpos.Y, duration);
+			if (result == null) {
+				return false;
+			}
+			return result.Data is bool s && s;
+		}
+
+		#endregion
+
+		#region 拖
+		/// <summary>
+		/// 拖动
+		/// </summary>
+		/// <param name="fx"></param>
+		/// <param name="fy"></param>
+		/// <param name="lx"></param>
+		/// <param name="ly"></param>
+		/// <param name="duration"></param>
+		/// <returns></returns>
+		public bool Drag(float fx, float fy, float lx, float ly, int duration = 55) {
+			if (duration < 2) {
+				duration = 2;
+			}
+			duration *= 200;
+			var fpos = Rel2Abs(fx, fy);
+			var lpos = Rel2Abs(lx, ly);
+			var result = JsonRpc("drag", fpos.X, fpos.Y, lpos.X, lpos.Y, duration);
+			if (result == null) {
+				return false;
+			}
+			return result.Data is bool s && s;
+		}
 		#endregion
 
 		#region 按下按钮
@@ -253,6 +371,61 @@ namespace HAtxLib {
 		public void Press(PressKey key) {
 			JsonRpc("pressKey", PressKeyDict[key]);
 		}
+		#endregion
+
+		#region 剪切板
+
+
+
+		#endregion
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		#region 坐标系转换
+		/// <summary>
+		/// 转换坐标系
+		/// </summary>
+		/// <param name="x"></param>
+		/// <param name="y"></param>
+		/// <returns></returns>
+		internal Point Rel2Abs(float x, float y) {
+			Point pos = new Point();
+			Size size = GetWindowSize();
+			if (x > 1) {
+				pos.X = (int)x;
+			} else {
+				pos.X = (int)(x * size.Width);				
+			}
+			if (y > 1) {
+				pos.Y = (int)y;
+			} else {
+				pos.Y = (int)(y * size.Height);
+			}
+			return pos;
+		}
+
 		#endregion
 
 		#region JSONRPC基函数
@@ -278,16 +451,17 @@ namespace HAtxLib {
 					{ "params", array }
 				};
 				if (_debug) {
-					Console.WriteLine($"JsonRpc >>> {json.ToString(Formatting.None)}");
+					Log.Debug($"JsonRpc >>> {json.ToString(Formatting.None)}");
 				}
 				try {
 					using (var socket = HSocket.Create(_url)) {
 						var result = socket.HttpPost("/jsonrpc/0", json);
 						if (_debug) {
-							Console.WriteLine($"JsonRpc <<< {result?.Content}");
+							string temp = result?.Content.Strip();
+							Log.Debug($"JsonRpc <<< {(temp.Length > 100 ? $"{temp.Substring(0, 100)} ... {temp.Substring(temp.Length - 51, 50)}" : temp)}");
 						}
-						if (result == null) {
-							return null;
+						if (result == null || result.Code != 200) {
+							throw new ATXException($"JsonRpc Fail {result?.Code}");
 						}
 						if (string.IsNullOrWhiteSpace(result.Content)) {
 							return null;
@@ -299,6 +473,19 @@ namespace HAtxLib {
 				}
 			});
 		}
+		#endregion
+
+		#region 元素操作
+
+		/// <summary>
+		/// 元素操作入口
+		/// </summary>
+		/// <param name="by"></param>
+		/// <returns></returns>
+		public UINode FindNode(By by) {
+			return new UINode(this, by);
+		}
+
 		#endregion
 
 		#region 启动UIAutomator
@@ -344,6 +531,7 @@ namespace HAtxLib {
 					continue;
 				}
 				if (IsAlive()) {
+					ShowFloatWindow();
 					return true;
 				}
 				Thread.Sleep(1000);
@@ -357,8 +545,12 @@ namespace HAtxLib {
 			return false;
 		}
 
-
+		private void ShowFloatWindow(bool show = true) {
+			_client.Shell("am", "start", "-n", "com.github.uiautomator/.ToastActivity", "-e", "showFloatWindow", show.ToString().ToLower());
+		}
 		#endregion
+
+		#region 子类
 
 		#region 初始化安装类
 
@@ -629,7 +821,7 @@ namespace HAtxLib {
 		};
 
 		public enum Orientation {
-			Natural,
+			Natural = 0,
 			Left,
 			Upsidedown,
 			Right
@@ -676,6 +868,140 @@ namespace HAtxLib {
 			Camera,
 			Power
 		}
+		#endregion
+
+		#region 设备信息
+		public class AtxDeviceInfo {
+			[JsonProperty("udid")]
+			public string udid { get; set; }
+			[JsonProperty("version")]
+			public string Version { get; set; }
+			[JsonProperty("serial")]
+			public string Serial { get; set; }
+			[JsonProperty("brand")]
+			public string Brand { get; set; }
+			[JsonProperty("model")]
+			public string Model { get; set; }
+			[JsonProperty("hwaddr")]
+			public string Hwaddr { get; set; }
+			[JsonProperty("sdk")]
+			public int Sdk { get; set; }
+			[JsonProperty("agentVersion")]
+			public string AgentVersion { get; set; }
+			[JsonProperty("display")]
+			public DisplayInfo Display { get; set; }
+			[JsonProperty("battery")]
+			public BatteryInfo Battery { get; set; }
+			[JsonProperty("memory")]
+			public MemoryInfo Memory { get; set; }
+			[JsonProperty("cpu")]
+			public CpuInfo Cpu { get; set; }
+			[JsonProperty("arch")]
+			public object Arch { get; set; }
+			[JsonProperty("owner")]
+			public object Owner { get; set; }
+			[JsonProperty("presenceChangedAt")]
+			public object PresenceChangedAt { get; set; }
+			[JsonProperty("usingBeganAt")]
+			public object UsingBeganAt { get; set; }
+			[JsonProperty("product")]
+			public object Product { get; set; }
+			[JsonProperty("provider")]
+			public object Provider { get; set; }
+
+			public class DisplayInfo {
+				[JsonProperty("width")]
+				public int Width { get; set; }
+				[JsonProperty("height")]
+				public int Height { get; set; }
+			}
+			public class BatteryInfo {
+				[JsonProperty("acPowered")]
+				public bool AcPowered { get; set; }
+				[JsonProperty("usbPowered")]
+				public bool UsbPowered { get; set; }
+				[JsonProperty("wirelessPowered")]
+				public bool WirelessPowered { get; set; }
+				[JsonProperty("present")]
+				public bool Present { get; set; }
+				[JsonProperty("status")]
+				public int Status { get; set; }
+				[JsonProperty("health")]
+				public int Health { get; set; }
+				[JsonProperty("level")]
+				public int Level { get; set; }
+				[JsonProperty("scale")]
+				public int Scale { get; set; }
+				[JsonProperty("voltage")]
+				public int Voltage { get; set; }
+				[JsonProperty("temperature")]
+				public int Temperature { get; set; }
+				[JsonProperty("technology")]
+				public string Technology { get; set; }
+			}
+			public class MemoryInfo {
+				[JsonProperty("total")]
+				public long Total { get; set; }
+
+				[JsonProperty("around")]
+				public string Around { get; set; }
+			}
+			public class CpuInfo {
+				[JsonProperty("cores")]
+				public int Cores { get; set; }
+				[JsonProperty("hardware")]
+				public string Hardware { get; set; }
+			}
+		}
+		#endregion
+
+		#region Touch
+
+		internal class AtxTouch {
+			private readonly HAtx _atx;
+			internal AtxTouch(HAtx atx) {
+				_atx = atx;
+			}
+
+			public AtxTouch Down(int x, int y) {
+				Event(0, x, y);
+				return this;
+			}
+
+			public AtxTouch Up(int x, int y) {
+				Event(1, x, y);
+				return this;
+			}
+
+			public AtxTouch Move(int x, int y) {
+				Event(2, x, y);
+				return this;
+			}
+
+			public AtxTouch Wait(int wait) {
+				Thread.Sleep(wait);
+				return this;
+			}
+
+			private void Event(int @event, int x, int y) {
+				_ = _atx.JsonRpc("injectInputEvent", @event, x, y, 0) ?? throw new ATXException("AtxTouch.Move fail");
+			}
+
+			public static AtxTouch Down(HAtx atx, int x, int y) {
+				return new AtxTouch(atx).Down(x, y);
+			}
+
+			public static AtxTouch Up(HAtx atx, int x, int y) {
+				return new AtxTouch(atx).Up(x, y);
+			}
+
+			public static AtxTouch Move(HAtx atx, int x, int y) {
+				return new AtxTouch(atx).Move(x, y);
+			}
+		}
+
+		#endregion
+
 		#endregion
 	}
 }

@@ -11,6 +11,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using static HAtxLib.Utils.HLog;
 
 namespace HAtxLib.ADB {
 	public class ADBSocket : IDisposable {
@@ -292,7 +293,7 @@ namespace HAtxLib.ADB {
 			if (IsDebug) {
 				StackTrace st = new StackTrace(true);
 				StackFrame sf = st.GetFrame(1);
-				Log.WriteLine("D", sf.GetMethod().Name, format, value);
+				Log.WriteLine(LogLevel.Error, sf.GetMethod().Name, format, value);
 			}
 		}
 

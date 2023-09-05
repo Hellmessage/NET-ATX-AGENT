@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Text;
+using System.Threading.Tasks;
 using System.Xml;
 
 namespace HAtxLib.UIAutomator {
@@ -38,6 +39,7 @@ namespace HAtxLib.UIAutomator {
 
 	public class By : JObject {
 		private readonly static Dictionary<ByMask, ByItem> MaskDict = new Dictionary<ByMask, ByItem>() {
+			{ ByMask.Xpath,                 new ByItem(){ Name = "xpath", Flag = string.Empty, Mask = (int)ByMask.Text } },
 			{ ByMask.Text,                  new ByItem(){ Name = "text", Flag = string.Empty, Mask = (int)ByMask.Text } },
 			{ ByMask.TextContains,          new ByItem(){ Name = "textContains", Flag = string.Empty, Mask = (int)ByMask.TextContains } },
 			{ ByMask.TextMatches,           new ByItem(){ Name = "textMatches", Flag = string.Empty, Mask = (int)ByMask.TextMatches } },
@@ -67,9 +69,9 @@ namespace HAtxLib.UIAutomator {
 		private const string DefaultEncoding = "ISO-8859-1";
 		public static Encoding Encoding { get; } = Encoding.GetEncoding(DefaultEncoding);
 		public ByMask Mask { get; private set; }
-		private string Value { get; set; }
+		public string Value { get; private set; }
 		private JArray ChildOrSibling { get; set; } = new JArray();
-		private JArray ChildOrSiblingSelector { get; set; } = new JArray();
+		private JArray ChildOrSiblingSelector { get; set; } = new JArray();  
 		private By[] SubBy { get; set; } = new By[0];
 		public Point Pos { get; private set; } = Point.Empty;
 
@@ -84,7 +86,12 @@ namespace HAtxLib.UIAutomator {
 		}
 
 		public override string ToString() {
-			return ToJson().ToString(Newtonsoft.Json.Formatting.None);
+			StringBuilder sb = new StringBuilder();
+			sb.Append(MaskDict[Mask].Name).Append('=').Append(Value);
+			foreach (By by in SubBy) {
+				sb.Append(", ").Append(by.ToString());
+			}
+			return sb.ToString();
 		}
 
 		public JObject ToJson() {
@@ -118,36 +125,37 @@ namespace HAtxLib.UIAutomator {
 			return Create(ByMask.Xpath, value);
 		}
 
-		public bool XpathToAndroid(string xml) {
-			if (Mask == ByMask.Xpath) {
-				try {
-					XmlDocument doc = new XmlDocument();
-					doc.LoadXml(xml);
-					var data = doc.SelectNodes(Value);
-					if (data != null) {
-						var element = data[0];
-						if (element != null) {
-							var value = element.Attributes["bounds"].Value;
-							var sp = value.Split(new string[] { "][" }, StringSplitOptions.None);
-							var tl = sp[0].Substring(1).Split(',');
-							var br = sp[1].Substring(0, sp[1].Length - 1).Split(',');
-							int tx = int.Parse(tl[0]);
-							int ty = int.Parse(tl[1]);
-							int bx = int.Parse(br[0]);
-							int by = int.Parse(br[1]);
-							int cx = (bx - tx) / 2;
-							int cy = (by - ty) / 2;
-							Pos = new Point(cx + tx, cy + ty);
-							return true;
-						}
-					}
-					return false;
-				} catch (Exception) {
-					return false;
-				}
-			}
-			return false;
-		}
+
+		//public bool XpathToAndroid(string xml) {
+		//	if (Mask == ByMask.Xpath) {
+		//		try {
+		//			XmlDocument doc = new XmlDocument();
+		//			doc.LoadXml(xml);
+		//			var data = doc.SelectNodes(Value);
+		//			if (data != null) {
+		//				var element = data[0];
+		//				if (element != null) {
+		//					var value = element.Attributes["bounds"].Value;
+		//					var sp = value.Split(new string[] { "][" }, StringSplitOptions.None);
+		//					var tl = sp[0].Substring(1).Split(',');
+		//					var br = sp[1].Substring(0, sp[1].Length - 1).Split(',');
+		//					int tx = int.Parse(tl[0]);
+		//					int ty = int.Parse(tl[1]);
+		//					int bx = int.Parse(br[0]);
+		//					int by = int.Parse(br[1]);
+		//					int cx = (bx - tx) / 2;
+		//					int cy = (by - ty) / 2;
+		//					Pos = new Point(cx + tx, cy + ty);
+		//					return true;
+		//				}
+		//			}
+		//			return false;
+		//		} catch (Exception) {
+		//			return false;
+		//		}
+		//	}
+		//	return false;
+		//}
 
 		internal class ByItem {
 			public string Name { get; set; }
