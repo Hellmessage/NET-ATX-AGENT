@@ -90,7 +90,7 @@ namespace HAtxLib.Utils {
 							int size = Convert.ToInt32(line, 16);
 							if (size > 0) {
 								line = Encoding.UTF8.GetString(ReadEndWith("\r\n"));
-								content.Append(line.Strip());
+								content.Append(line.Strip(false));
 							} else {
 								break;
 							}

@@ -2,7 +2,7 @@
 
 namespace HAtxLib.Extend {
 	public static class String {
-		internal static string Strip(this string s) {
+		internal static string Strip(this string s, bool trim = true) {
 			if (string.IsNullOrWhiteSpace(s)) {
 				return "";
 			}
@@ -15,7 +15,11 @@ namespace HAtxLib.Extend {
 			while (s.EndsWith("\r")) {
 				s = s.Substring(0, s.Length - 1);
 			}
-			return s.Trim().TrimStart().TrimEnd();
+			if (trim) {
+				return s.Trim().TrimStart().TrimEnd();
+			} else {
+				return s;
+			}
 		}
 
 		internal static string Unicode(this string str) {
