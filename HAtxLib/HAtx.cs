@@ -299,7 +299,7 @@ namespace HAtxLib {
 		/// <param name="x"></param>
 		/// <param name="y"></param>
 		/// <param name="time"></param>
-		public void LoginClick(float x, float y, int time = 500) {
+		public void LongClick(float x, float y, int time = 500) {
 			Thread.Sleep(UINodeClickExistDelay);
 			var pos = Rel2Abs(x, y);
 			AtxTouch.Down(this, pos.X, pos.Y).Wait(time).Up(pos.X, pos.Y);

@@ -9,25 +9,44 @@
 ---
 > ADBSocket  
 > - 主要用于与ADB Server 通讯  
-> - 目前只实现了 Serial 方式 通过 **HOST** 方式连接后续会完善
+> - Usb(Serial) (已完成)
+> - WIFI Host (未进行)
 	
 > ADBClient  
 > - 对ADBSocket的进一步封装 目的就是为了用得方便
 
+> HSocket
+> - Http 请求
+> - WebSocket (未进行) 
+
 > HAtx (**进行中**)
 > - 初始化安装
+>	- Initer 
 > - 设备上线
-> - Selector (选择器)
->   - 简单实现了前置参数
+>	- RunUiautomator
+> - UINode[Selector] (UI选择器)
+>   - Click
+>   - Text
+>   - Exists
 >	- **待进行[更复杂的多级查询]**
 > - XPATH (简单实现 可能有BUG)
 > - RPC (进行中)
 >	- Click
+>	- DoubleClick
+>	- LongClick
 >	- Press
+>	- Swipe
+>	- Drag
+>	- ScreenOn
+>	- ScreenOff
 >	- WaitForExists
 >	- FreezeRotation
 >	- SetOrientation
+>	- GetWindowSize
+>	- GetOrientation
 >	- DeviceInfo
+>	- Info
+>   - Touch(Down, Move, Up)
 ---
 
 ## 存在的问题
