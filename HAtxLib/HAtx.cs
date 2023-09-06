@@ -1,6 +1,7 @@
 ﻿using HAtxLib.ADB;
 using HAtxLib.Catch;
 using HAtxLib.Extend;
+using HAtxLib.Script;
 using HAtxLib.UIAutomator;
 using HAtxLib.UIAutomator.Model;
 using HAtxLib.Utils;
@@ -24,6 +25,18 @@ namespace HAtxLib {
 		private string _url = null;
 		private bool _debug = false;
 
+		public string UDID {
+			get {
+				return _serial;
+			}
+		}
+
+		public ADBClient ADB {
+			get {
+				return _client;
+			}
+		}
+
 		#region 全局设置
 
 		public int UINodeMaxWaitTime { get; set; } = 2000;
@@ -34,20 +47,26 @@ namespace HAtxLib {
 
 		#endregion
 
-		public HAtx(string serial) {
+		public HAtx(string serial, bool init = true) {
 			_serial = serial;
 			_client = new ADBClient(_serial);
-			Initer initer = new Initer(_client);
-			while (true) {
-				try {
-					initer.Install();
-					break;
-				} catch (Exception) {
-					continue;
+			if (init) {
+				Initer initer = new Initer(_client);
+				while (true) {
+					try {
+						initer.Install();
+						break;
+					} catch (Exception) {
+						continue;
+					}
 				}
+				Console.WriteLine($"HAtx<{_serial}> Connect: {Connect()}");
+				HRuntime.Run("运行 UIAUTOMATOR", () => Console.WriteLine($"HAtx<{_serial}> RunUiautomator: {RunUiautomator()}"));
 			}
-			Console.WriteLine($"HAtx<{_serial}> Connect: {Connect()}");
-			HRuntime.Run("运行 UIAUTOMATOR", () => Console.WriteLine($"HAtx<{_serial}> RunUiautomator: {RunUiautomator()}"));
+		}
+
+		public bool RunScript(IScript script) {
+			return script.RunScript(this);
 		}
 
 		#region 连接
@@ -379,29 +398,166 @@ namespace HAtxLib {
 
 		#endregion
 
+		#region App相关
 
+		public AppInfo GetAppInfo(string package) {
+			using (HSocket socket = HSocket.Create(_url)) {
+				var result = socket.HttpGet($"/packages/{package}/info");
+				if (result == null) {
+					return new AppInfo();
+				}
+				var info = JsonConvert.DeserializeObject<AppInfo>(result.Content);
+				return info;
+			}
+		}
 
+        public void AppStart(string package, bool monkey = false, bool stop = false, bool wait = false, string activity = null) {
+			if (stop) {
+                AppStop(package);
+            }
+			if (monkey) {
+				_client.Shell("monkey", "-p", package, "-c", "android.intent.category.LAUNCHER", "1");
+				if (wait) {
+					AppWait(package);
+				}
+				return;
+			}
+			if (string.IsNullOrWhiteSpace(activity)) {
+                var info = GetAppInfo(package);
+                if (info.Success) {
+					activity = info.Data.MainActivity;
+					if (activity.IndexOf('.') == -1) {
+						activity = "." + activity;
+					}
+                }
+            }
+			_client.Shell("am", "start", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER", "-n", $"{package}/{activity}");
+            if (wait) {
+                AppWait(package);
+            }
+		}
 
+		public void AppStop(string package) {
+            _client.Shell("am", "force-stop", package);
+        }
 
+		public void AppClear(string package) {
+			_client.Shell("pm", "clear", package);
+		}
 
+		public void AppUninstall(string package) {
+			_client.Shell("pm", "uninstall", package);
+		}
 
+		public void AppUninstallAll(params string[] excludes) {
+			List<string> list = new List<string>() {
+				"com.github.uiautomator",
+				"com.github.uiautomator.test"
+			};
+			list.AddRange(excludes);
+			var apps = _client.AppList("-3");
+			foreach (string app in apps) {
+				if (list.Contains(app)) {
+					continue;
+				}
+				AppUninstall(app);
+			}
+		}
 
+		public void AppStopAll(params string[] excludes) {
+			List<string> list = new List<string>() {
+				"com.github.uiautomator",
+				"com.github.uiautomator.test"
+			};
+			list.AddRange(excludes);
+			List<string> apps = _client.AppRunningList();
+			foreach (string app in apps) {
+				if (list.Contains(app)) {
+					continue;
+				}
+				AppStop(app);
+			}
 
+		}
 
+		public int AppPidOf(string package) {
+			using (HSocket socket = HSocket.Create(_url)) {
+				var result = socket.HttpGet($"/pidof/{package}");
+				if (result == null) {
+					return -1;
+				}
+				if (int.TryParse(result.Content,out int pid)) {
+					return pid;
+				}
+			}
+			return -1;
+		}
 
+		public AppCurrentInfo AppCurrent() {
+			AppCurrentInfo info = new AppCurrentInfo();
+			var result = _client.Shell("dumpsys", "window", "windows");
+			Regex focus = new Regex("mCurrentFocus=Window\\{.*?\\s+(?<package>[^\\s]+)/(?<activity>[^\\s]+)\\}");
+			Match match = focus.Match(result);
+			if (match.Success) {
+				info.Package = match.Groups["package"].Value;
+				info.Activity = match.Groups["activity"].Value;
+				return info;
+			}
+			result = _client.Shell("dumpsys", "activity", "activities");
+			Regex record = new Regex("mResumedActivity: ActivityRecord\\{.*?\\s+(?<package>[^\\s]+)/(?<activity>[^\\s]+)\\s.*?\\}");
+			match = record.Match(result);
+			if (match.Success) {
+				info.Package = match.Groups["package"].Value;
+				result = _client.Shell("dumpsys", "activity", "top");
+				Regex activity = new Regex("ACTIVITY (?<package>[^\\s]+)/(?<activity>[^/\\s]+) \\w+ pid=(?<pid>\\d+)");
+				var matchs = activity.Matches(result);
+				if (matchs.Count > 0) {
+					for (int i = 0; i < matchs.Count; i++) {
+						if (matchs[i].Groups["package"].Value == info.Package) {
+							info.Activity = matchs[i].Groups["activity"].Value;
+							info.Pid = int.TryParse(matchs[i].Groups["pid"].Value, out int pid) ? pid : 0;
+							return info;
+						}
+					}
+				}
+			}
+			return null;
+		}
 
+		public bool AppWait(string package, int timeout = 20000, string activity = null, bool front = false) {
+			long deadline = DateTimeOffset.Now.ToUnixTimeMilliseconds() + timeout;
+			while (DateTimeOffset.Now.ToUnixTimeMilliseconds() < deadline) {
+				try {
+					if (front) {
+						var info = AppCurrent();
+						if (info == null) {
+							continue;
+						}
+						if (info.Package == package) {
+							if (!string.IsNullOrWhiteSpace(activity)) {
+								if (activity == info.Activity) {
+									return true;
+								}
+							} else {
+								return true;
+							}
+						}
+					} else {
+						var list = _client.AppRunningList();
+						if (list.Contains(package)) {
+							return true;
+						}
+					}
+				} catch (Exception) {
 
+				} finally {
+					Thread.Sleep(1000);
+				}
+			}
+			return false;
+		}
 
-
-
-
-
-
-
-
-
-
-
+		#endregion
 
 		#region 坐标系转换
 		/// <summary>
@@ -550,8 +706,6 @@ namespace HAtxLib {
 		}
 		#endregion
 
-		#region 子类
-
 		#region 初始化安装类
 
 		internal class Initer {
@@ -563,7 +717,7 @@ namespace HAtxLib {
 			private readonly static string ATX_AGENT_VERSION = "0.10.0";
 
 			private readonly static ReaderWriterLockSlim DownLock = new ReaderWriterLockSlim();
-			private readonly static string CACHE_PATH = $"{AppDomain.CurrentDomain.BaseDirectory}/cache/";
+			private readonly static string CACHE_PATH = $"{AppDomain.CurrentDomain.BaseDirectory}/{Properties.Resources.CACHE_PATH}";
 			private readonly static string ATX_LISTEN_ADDR = "127.0.0.1:7912";
 			private readonly static string GITHUB_BASEURL = "https://github.com/openatx";
 			private readonly static string GITHUB_DOWN_APK_PATH = "/android-uiautomator-server/releases/download/";
@@ -611,6 +765,9 @@ namespace HAtxLib {
 
 			#region atx-agent
 			public void SetupAtxAgent() {
+				if (CheckAtxAgentVersion()) {
+					return;
+				}
 				_client.KillProcessByName("atx-agent");
 				_client.Shell(ATX_AGENT_PATH, "server", "--stop");
 				Thread.Sleep(500);
@@ -647,7 +804,6 @@ namespace HAtxLib {
 					return true;
 				}
 			}
-
 
 			private bool IsAtxAgentOutdated() {
 				try {
@@ -955,6 +1111,43 @@ namespace HAtxLib {
 		}
 		#endregion
 
+		#region APP信息
+		public class AppInfo {
+			[JsonProperty("data")]
+			public DataInfo Data { get; set; }
+			[JsonProperty("success")]
+			public bool Success { get; set; } = false;
+			[JsonProperty("description")]
+			public string Description { get; set; }
+
+			public class DataInfo {
+				[JsonProperty("packageName")]
+				public string PackageName { get; set; }
+				[JsonProperty("mainActivity")]
+				public string MainActivity { get; set; }
+				[JsonProperty("label")]
+				public string Label { get; set; }
+				[JsonProperty("versionName")]
+				public string VersionName { get; set; }
+				[JsonProperty("versionCode")]
+				public long VersionCode { get; set; }
+				[JsonProperty("size")]
+				public long Size { get; set; }
+			}
+		}
+		#endregion
+
+		#region AppCurrent
+		public class AppCurrentInfo {
+			[JsonProperty("package")]
+			public string Package { get; set; }
+			[JsonProperty("activity")]
+			public string Activity { get; set; }
+			[JsonProperty("pid")]
+			public int Pid { get; set; } = -1;
+		}
+		#endregion
+
 		#region Touch
 
 		internal class AtxTouch {
@@ -999,8 +1192,6 @@ namespace HAtxLib {
 				return new AtxTouch(atx).Move(x, y);
 			}
 		}
-
-		#endregion
 
 		#endregion
 	}

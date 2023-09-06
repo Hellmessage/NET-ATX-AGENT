@@ -12,7 +12,7 @@ namespace HAtxLib.Utils {
 		private string _class;
 		private string _name;
 
-		internal static HLog Get<T>(string prefix) {
+        internal static HLog Get<T>(string prefix) {
 			return new HLog() {
 				_class = typeof(T).Name,
 				_name = prefix,
@@ -34,7 +34,11 @@ namespace HAtxLib.Utils {
 			Log(LogLevel.Warn, format, argv);
 		}
 
-		private void Log(LogLevel level, string format, params object[] argv) {
+        public void Error(string format, params object[] argv) {
+            Log(LogLevel.Error, format, argv);
+        }
+
+        private void Log(LogLevel level, string format, params object[] argv) {
 			StackTrace st = new StackTrace(true);
 			StackFrame sf = st.GetFrame(2);
 			WriteLine(level, sf.GetMethod().Name, format, argv);

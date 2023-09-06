@@ -1,4 +1,5 @@
 ﻿using HAtxLib;
+using HAtxLib.ADB;
 using HAtxLib.Extend;
 using HAtxLib.UIAutomator;
 using HAtxLib.Utils;
@@ -11,10 +12,13 @@ using System.Threading;
 namespace Demo {
 	internal class Program {
 		static void Main(string[] args) {
+			//ADBServer.StartServer();
 
 			HAtx atx = new HAtx("304155554f363098");
 			Console.WriteLine(atx.AtxAgentUrl);
 			atx.SetDebug();
+			atx.ADB.AppList("-3");
+			Console.WriteLine(atx.AppCurrent());
 			//atx.DumpHierarchy();
 			//atx.DumpWindowHierarchy();
 			
@@ -26,13 +30,13 @@ namespace Demo {
 			//Thread.Sleep(2000);
 			//atx.ScreenOn();
 
-			atx.Press(HAtx.PressKey.Home);
+			//atx.Press(HAtx.PressKey.Home);
 			//atx.ShowInfo();
 
 			//Console.WriteLine($"UINode({ByMask.Index}<{By.ResourceId("xxxxx", By.Text("Chrome"), By.Text("Chrome"), By.Text("Chrome"))}>) not found");
 
 			//var a = atx.FindNode(By.Xpath("//*[@content-desc=\"Google\"]"));
-			//Console.WriteLine(a.Text());
+			//Console.WriteLine(a.Exists(20000));
 
 			//a = atx.FindNode(By.Xpath("//*[@content-desc=\"Google\"]"));
 			//Console.WriteLine(a.Text());

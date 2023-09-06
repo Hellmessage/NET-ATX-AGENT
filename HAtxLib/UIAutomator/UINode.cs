@@ -10,6 +10,7 @@ using System.Xml;
 
 namespace HAtxLib.UIAutomator {
 	public class UINode {
+		private readonly static HLog Log = HLog.Get<HLog>("选择器");
 		private readonly HAtx _atx;
 		private readonly By _by;
 		private XmlNodeList _nodes = null;
@@ -60,9 +61,8 @@ namespace HAtxLib.UIAutomator {
 		/// <param name="wait">最长等待时间</param>
 		/// <returns></returns>
 		public bool Click(int wait = -1) {
-			if ((_by.Mask == ByMask.Xpath ? XPathExist() : Exists(wait))) {
+			if (Exists(wait)) {
 				Point pos = Info.Bound.CenterPos;
-				Thread.Sleep(_atx.UINodeClickDelay);
 				return _atx.Click(pos.X, pos.Y);
 			}
 			return false;
@@ -77,24 +77,31 @@ namespace HAtxLib.UIAutomator {
 		/// <returns></returns>
 		/// <exception cref="ATXException"></exception>
 		/// <exception cref="ATXNodeException"></exception>
-		public bool Exists(int wait = -1) {
-			if (wait == -1) {
-				wait = _atx.UINodeMaxWaitTime;
+		public bool Exists(int wait = -1, bool xpathSub = false) {
+			try {
+                if (wait == -1) {
+                    wait = _atx.UINodeMaxWaitTime;
+                }
+                if (_by.Mask == ByMask.Xpath) {
+					if (xpathSub) {
+                        Thread.Sleep(wait);
+                        _nodes = FindNodes(_atx.DumpWindowHierarchy());
+                        if (_nodes != null) {
+                            _node = _nodes[0];
+                        }
+                        return _node != null;
+                    }
+					return XPathExist(wait);
+                }
+                var result = _atx.JsonRpc("waitForExists", _by, wait) ?? throw new ATXException("UINodeExists Fail");
+                if (result.Error != null) {
+                    throw new ATXNodeException("UINodeExists Fail", result.Error);
+                }
+                return result.Data is bool v && v;
+            } catch (Exception ex) {
+				Log.Error($"Serial<{_atx.UDID}>: {ex.Message}");
+                return false;
 			}
-			if (_by.Mask == ByMask.Xpath) {
-				Thread.Sleep(wait);
-				_nodes = FindNodes(_atx.DumpWindowHierarchy());
-				if (_nodes != null) {
-					_node = _nodes[0];
-				}
-				//_node = XpathFindNode(_atx.DumpWindowHierarchy());
-				return _node != null;
-			}
-			var result = _atx.JsonRpc("waitForExists", _by, wait) ?? throw new ATXException("UINodeExists Fail");
-			if (result.Error != null) {
-				throw new ATXNodeException("UINodeExists Fail", result.Error);
-			}
-			return result.Data is bool v && v;
 		}
 		
 		private bool XPathExist(int wait = -1) {
@@ -102,7 +109,7 @@ namespace HAtxLib.UIAutomator {
 				wait = _atx.UINodeMaxWaitTime;
 			}
 			while (wait > 0) {
-				bool exist = HRuntime.Time(() => Exists(60), out int time);
+				bool exist = HRuntime.Time(() => Exists(60, true), out int time);
 				wait -= time;
 				if (exist) {
 					return true;
@@ -153,7 +160,7 @@ namespace HAtxLib.UIAutomator {
 		#endregion
 
 	}
-
+	
 	internal class NodeObj {
 		[JsonProperty("bounds")]
 		public Bounds Bound { get; set; }

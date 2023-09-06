@@ -121,5 +121,35 @@ namespace HAtxLib.ADB {
 			return Shell("dumpsys", "power").Contains("mHoldingDisplaySuspendBlocker=true");
 		}
 
+		public List<string> AppList(string filter = "") {
+			List<string> list = new List<string>();
+			var result = Shell("pm", "list", "packages", filter);
+			if (!string.IsNullOrWhiteSpace(result)) {
+				string[] sp = result.Split(new string[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+				foreach (string app in sp) {
+					if (app.StartsWith("package:")) {
+						string line = app.Split(':')[1];
+						list.Add(line);
+					}
+				}
+			}
+			return list;
+		}
+
+		public List<string> AppRunningList() {
+			List<string> apps = AppList();
+			List<AndroidProcessItem> process = GetProcessList();
+			List<string> list = new List<string>();
+			foreach (string app in apps) {
+				foreach (var item in process) {
+					if (item.Name.Contains(app)) {
+						list.Add(app);
+						break;
+					}
+				}
+			}
+			return list;
+		}
+
 	}
 }
