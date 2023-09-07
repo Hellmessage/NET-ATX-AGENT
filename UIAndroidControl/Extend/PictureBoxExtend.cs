@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -36,13 +37,17 @@ namespace UIAndroidControl.Extend {
 			}
 		}
 
+		internal static void WaitRotate(this PictureBox view) {
+			while (Dict.ContainsKey(view)) {
+				Thread.Sleep(100);
+			}
+		}
+
 		internal static void StopRotate(this PictureBox view) {
 			if (Dict.ContainsKey(view)) {
 				Dict.TryUpdate(view, false, true);
 			}
 		}
-
-
 
 		private static Image RotateImage(Image image, float angle) {
 			Bitmap rotatedBitmap = new Bitmap(image.Width, image.Height);

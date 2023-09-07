@@ -1,11 +1,9 @@
 ﻿using System;
 using System.Diagnostics;
-using System.Xml.Linq;
 
 namespace HAtxLib.Utils {
 	public class HRuntime {
 		private readonly static HLog Log = HLog.Get<HRuntime>("计时器");
-
 
 		public static void Run(Action action) {
 			Run("HRuntime", action);

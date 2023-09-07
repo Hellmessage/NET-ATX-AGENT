@@ -24,10 +24,22 @@
 		/// </summary>
 		private void InitializeComponent() {
 			System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(UIMain));
-			this.UIBox = new System.Windows.Forms.PictureBox();
 			this.LoadingLabel = new System.Windows.Forms.Label();
+			this.UIBox = new System.Windows.Forms.PictureBox();
 			((System.ComponentModel.ISupportInitialize)(this.UIBox)).BeginInit();
 			this.SuspendLayout();
+			// 
+			// LoadingLabel
+			// 
+			this.LoadingLabel.BackColor = System.Drawing.Color.Transparent;
+			this.LoadingLabel.FlatStyle = System.Windows.Forms.FlatStyle.Popup;
+			this.LoadingLabel.Location = new System.Drawing.Point(56, 56);
+			this.LoadingLabel.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+			this.LoadingLabel.Name = "LoadingLabel";
+			this.LoadingLabel.Size = new System.Drawing.Size(100, 100);
+			this.LoadingLabel.TabIndex = 1;
+			this.LoadingLabel.Text = "连接中";
+			this.LoadingLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
 			// 
 			// UIBox
 			// 
@@ -37,35 +49,30 @@
 			this.UIBox.BackColor = System.Drawing.Color.Transparent;
 			this.UIBox.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
 			this.UIBox.Image = global::UIAndroidControl.Properties.Resources.loading;
-			this.UIBox.Location = new System.Drawing.Point(12, 12);
+			this.UIBox.Location = new System.Drawing.Point(6, 6);
+			this.UIBox.Margin = new System.Windows.Forms.Padding(2);
 			this.UIBox.Name = "UIBox";
-			this.UIBox.Size = new System.Drawing.Size(400, 400);
+			this.UIBox.Size = new System.Drawing.Size(200, 200);
 			this.UIBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage;
 			this.UIBox.TabIndex = 0;
 			this.UIBox.TabStop = false;
 			this.UIBox.MouseDown += new System.Windows.Forms.MouseEventHandler(this.UIBox_MouseDown);
+			this.UIBox.MouseEnter += new System.EventHandler(this.UIBox_MouseEnter);
+			this.UIBox.MouseLeave += new System.EventHandler(this.UIBox_MouseLeave);
 			this.UIBox.MouseMove += new System.Windows.Forms.MouseEventHandler(this.UIBox_MouseMove);
 			this.UIBox.MouseUp += new System.Windows.Forms.MouseEventHandler(this.UIBox_MouseUp);
 			// 
-			// LoadingLabel
-			// 
-			this.LoadingLabel.BackColor = System.Drawing.Color.Transparent;
-			this.LoadingLabel.Location = new System.Drawing.Point(112, 112);
-			this.LoadingLabel.Name = "LoadingLabel";
-			this.LoadingLabel.Size = new System.Drawing.Size(201, 201);
-			this.LoadingLabel.TabIndex = 1;
-			this.LoadingLabel.Text = "连接中";
-			this.LoadingLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-			// 
 			// UIMain
 			// 
-			this.AutoScaleDimensions = new System.Drawing.SizeF(12F, 24F);
+			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			this.BackColor = System.Drawing.SystemColors.ActiveBorder;
-			this.ClientSize = new System.Drawing.Size(424, 424);
+			this.ClientSize = new System.Drawing.Size(212, 212);
 			this.Controls.Add(this.LoadingLabel);
 			this.Controls.Add(this.UIBox);
 			this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
+			this.KeyPreview = true;
+			this.Margin = new System.Windows.Forms.Padding(2);
 			this.MaximizeBox = false;
 			this.MinimizeBox = false;
 			this.Name = "UIMain";
@@ -73,6 +80,10 @@
 			this.Text = "安卓控制器";
 			this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.UIMain_FormClosing);
 			this.Load += new System.EventHandler(this.UIMain_Load);
+			this.LocationChanged += new System.EventHandler(this.UIMain_LocationChanged);
+			this.KeyDown += new System.Windows.Forms.KeyEventHandler(this.UIMain_KeyDown);
+			this.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.UIMain_KeyPress);
+			this.KeyUp += new System.Windows.Forms.KeyEventHandler(this.UIMain_KeyUp);
 			((System.ComponentModel.ISupportInitialize)(this.UIBox)).EndInit();
 			this.ResumeLayout(false);
 

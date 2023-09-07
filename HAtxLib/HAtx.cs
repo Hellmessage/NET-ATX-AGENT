@@ -21,9 +21,11 @@ namespace HAtxLib {
 		private readonly static HLog Log = HLog.Get<HAtx>("核心");
 		private readonly string _serial;
 		private readonly ADBClient _client;
+		private readonly InitHelper _initer;
 		private int _port = -1;
 		private string _url = null;
 		private bool _debug = false;
+		
 
 		public string UDID {
 			get {
@@ -34,6 +36,12 @@ namespace HAtxLib {
 		public ADBClient ADB {
 			get {
 				return _client;
+			}
+		}
+
+		public InitHelper Initer {
+			get {
+				return _initer;
 			}
 		}
 
@@ -51,10 +59,10 @@ namespace HAtxLib {
 			_serial = serial;
 			_client = new ADBClient(_serial);
 			if (init) {
-				Initer initer = new Initer(_client);
+				_initer = new InitHelper(_client);
 				while (true) {
 					try {
-						initer.Install();
+						_initer.Install();
 						break;
 					} catch (Exception) {
 						continue;
@@ -351,6 +359,24 @@ namespace HAtxLib {
 
 		#endregion
 
+		#region 屏幕操作
+
+		public void TouchDown(float x, float y) {
+			var pos = Rel2Abs(x, y);
+			AtxTouch.Down(this, pos.X, pos.Y);
+		}
+
+		public void TouchMove(float x, float y) {
+			var pos = Rel2Abs(x, y);
+			AtxTouch.Move(this, pos.X, pos.Y);
+		}
+
+		public void TouchUp(float x, float y) {
+			var pos = Rel2Abs(x, y);
+			AtxTouch.Up(this, pos.X, pos.Y);
+		}
+		#endregion
+
 		#region 拖
 		/// <summary>
 		/// 拖动
@@ -431,6 +457,7 @@ namespace HAtxLib {
 					}
                 }
             }
+			Console.WriteLine($"{package}/{activity}");
 			_client.Shell("am", "start", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER", "-n", $"{package}/{activity}");
             if (wait) {
                 AppWait(package);
@@ -695,7 +722,7 @@ namespace HAtxLib {
 			UIService.Stop();
 			string result = _client.Shell("am instrument -w -r -e debug false -e class com.github.uiautomator.stub.Stub com.github.uiautomator.test/android.support.test.runner.AndroidJUnitRunner");
 			if (result.Contains("does not have a signature matching the target")) {
-				Initer initer = new Initer(_client);
+				InitHelper initer = new InitHelper(_client);
 				initer.SetupAtxApp();
 			}
 			return false;
@@ -708,7 +735,7 @@ namespace HAtxLib {
 
 		#region 初始化安装类
 
-		internal class Initer {
+		public class InitHelper {
 			private readonly ADBClient _client;
 			private readonly string _abi;
 			private readonly string _sdk;
@@ -757,15 +784,15 @@ namespace HAtxLib {
 				}
 			}
 
-			public Initer(ADBClient client) {
+			public InitHelper(ADBClient client) {
 				_client = client;
 				_abi = _client.GetProp("ro.product.cpu.abi");
 				_sdk = _client.GetProp("ro.build.version.sdk");
 			}
 
 			#region atx-agent
-			public void SetupAtxAgent() {
-				if (CheckAtxAgentVersion()) {
+			public void SetupAtxAgent(bool restart = false) {
+				if (CheckAtxAgentVersion() && !restart) {
 					return;
 				}
 				_client.KillProcessByName("atx-agent");
