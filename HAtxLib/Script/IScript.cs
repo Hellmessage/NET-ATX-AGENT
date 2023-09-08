@@ -8,8 +8,10 @@ namespace HAtxLib.Script {
 	public interface IScript {
 
 		void UpdateProgress(string text);
+		void TaskSuccess();
+		void TaskFailure(string text);
 
-        bool RunScript(HAtx atx);
+        void RunScript(HAtx atx);
 
 	}
 }

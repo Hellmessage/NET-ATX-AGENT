@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Net;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 
@@ -26,7 +27,11 @@ namespace HAtxLib {
 		private string _url = null;
 		private bool _debug = false;
 		
-
+		public int Port {
+			get {
+				return _port;
+			}
+		}
 		public string UDID {
 			get {
 				return _serial;
@@ -68,13 +73,19 @@ namespace HAtxLib {
 						continue;
 					}
 				}
-				Console.WriteLine($"HAtx<{_serial}> Connect: {Connect()}");
-				HRuntime.Run("运行 UIAUTOMATOR", () => Console.WriteLine($"HAtx<{_serial}> RunUiautomator: {RunUiautomator()}"));
+				Log.Info($"HAtx<{_serial}> Connect: {Connect()}");
+				HRuntime.Run("运行 UIAUTOMATOR", () => Log.Info($"HAtx<{_serial}> RunUiautomator: {RunUiautomator()}"));
 			}
 		}
 
-		public bool RunScript(IScript script) {
-			return script.RunScript(this);
+		public void RunScript(IScript script, Action notify) {
+			HTry.Run(() => {
+				script.RunScript(this);
+			}, () => {
+				script.TaskFailure("RunScript Error");
+			}, () => {
+				notify?.Invoke();
+			});
 		}
 
 		#region 连接
@@ -119,8 +130,9 @@ namespace HAtxLib {
 		#endregion
 
 		#region 设置DEBUG
-		public void SetDebug() {
-			_debug = true;
+		public void SetDebug(bool debug = true) {
+			_debug = debug;
+			HLog.InDebug = _debug;
 		}
 		#endregion
 
@@ -347,7 +359,6 @@ namespace HAtxLib {
 			if (duration < 2) {
 				duration = 2;
 			}
-			duration *= 200;
 			var fpos = Rel2Abs(fx, fy);
 			var lpos = Rel2Abs(lx, ly);
 			var result = JsonRpc("swipe", fpos.X, fpos.Y, lpos.X, lpos.Y, duration);
@@ -457,7 +468,7 @@ namespace HAtxLib {
 					}
                 }
             }
-			Console.WriteLine($"{package}/{activity}");
+			Log.Debug($"启动APP: {package}/{activity}");
 			_client.Shell("am", "start", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER", "-n", $"{package}/{activity}");
             if (wait) {
                 AppWait(package);
@@ -586,6 +597,63 @@ namespace HAtxLib {
 
 		#endregion
 
+		#region 输入法
+
+		public void ImeClearText() {
+			ImeWait();
+			ADB.Shell("am", "broadcast", "-a", "ADB_CLEAR_TEXT");
+		}
+
+		public void ImeInputText(string text, bool clear = false) {
+			ImeWait();
+			string data = Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
+			string type = "ADB_SET_TEXT";
+			if (!clear) {
+				type = "ADB_INPUT_TEXT";
+			}
+			ADB.Shell("am", "broadcast", "-a", type, "--es", "text", data);
+		}
+
+		public void ImeWait(int timeout = 5000) {
+			long deadline = DateTimeOffset.Now.ToUnixTimeMilliseconds() + timeout;
+			while (DateTimeOffset.Now.ToUnixTimeMilliseconds() < deadline) {
+				bool show = ImeCurrent(out string ime);
+				if (!ime.StartsWith("mCurMethodId=com.github.uiautomator/.FastInputIME")) {
+					ImeSet(true);
+					Thread.Sleep(500);
+					continue;
+				}
+				if (show) {
+					return;
+				}
+				Thread.Sleep(200);
+			}
+		}
+
+		public void ImeSet(bool fastime) {
+			string fast_ime = "com.github.uiautomator/.FastInputIME";
+			if (fastime) {
+				ADB.Shell("ime", "enable", fast_ime);
+				ADB.Shell("ime", "set", fast_ime);
+			} else {
+				ADB.Shell("ime", "disable", fast_ime);
+			}
+		}
+
+		public bool ImeCurrent(out string ime) {
+			var result = ADB.Shell("dumpsys", "input_method");
+			Regex regex = new Regex("mCurMethodId=([-_./\\w]+)");
+			Match match = regex.Match(result);
+			if (match.Success) {
+				ime = match.Groups[0].Value;	
+			} else {
+				ime = "";
+			}
+			return result.Contains("mInputShown=true");
+		}
+
+		#endregion
+
 		#region 坐标系转换
 		/// <summary>
 		/// 转换坐标系
@@ -691,7 +759,7 @@ namespace HAtxLib {
 				return true;
 			}
 			if (service) {
-				Console.WriteLine($"Uiautomator Service Stop: {UIService.Stop()}");
+				Log.Debug($"Uiautomator Service Stop: {UIService.Stop()}");
 			}
 			Thread.Sleep(1000);
 			GrantAppPermissions();
@@ -705,10 +773,10 @@ namespace HAtxLib {
 				"-n",
 				"com.github.uiautomator/.ToastActivity",
 			};
-			Console.WriteLine($"RunUiautomator: {_client.Shell(argv)}");
-			Console.WriteLine($"Uiautomator Service Start: {UIService.Start()}");
+			Log.Debug($"RunUiautomator: {_client.Shell(argv)}");
+			Log.Debug($"Uiautomator Service Start: {UIService.Start()}");
 			Thread.Sleep(500);
-			Console.WriteLine($"Uiautomator Running: {UIService.Running()}");
+			Log.Debug($"Uiautomator Running: {UIService.Running()}");
 			while (timeout-- > 0) {
 				if (!UIService.Running()) {
 					continue;
@@ -736,6 +804,7 @@ namespace HAtxLib {
 		#region 初始化安装类
 
 		public class InitHelper {
+			private readonly static HLog Log = HLog.Get<InitHelper>("安装辅助");
 			private readonly ADBClient _client;
 			private readonly string _abi;
 			private readonly string _sdk;
@@ -804,7 +873,7 @@ namespace HAtxLib {
 					if (!File.Exists(file)) {
 						HZip.UnzipTgz(ATX_AGENT_CAHCE_FILE, Path.GetDirectoryName(file));
 					}
-					Console.WriteLine($"PUSH {file}: {_client.Push(file, ATX_AGENT_PATH)}");
+					Log.Debug($"PUSH {file}: {_client.Push(file, ATX_AGENT_PATH)}");
 				}
 				_client.Shell(ATX_AGENT_PATH, "server", "--nouia", "-d", "--addr", ATX_LISTEN_ADDR);
 				int size = 10;
@@ -815,7 +884,7 @@ namespace HAtxLib {
 					}
 					Thread.Sleep(500);
 				}
-				Console.WriteLine($"SetupAtxAgent: True");
+				Log.Info($"SetupAtxAgent: True");
 			}
 
 			public bool CheckAtxAgentVersion() {
@@ -862,8 +931,8 @@ namespace HAtxLib {
 						string url = $"{GITHUB_BASEURL}{GITHUB_DOWN_APK_PATH}{ATX_APP_VERSION}/{app}.apk";
 						string file = $"{CACHE_PATH}apk/{ATX_APP_VERSION}/{app}.apk";
 						GithubDown(url, file);
-						Console.WriteLine($"PUSH {tmp}: {_client.Push(file, tmp, 420)}");
-						Console.WriteLine($"INSTALL {tmp}: {_client.Shell("pm", "install", "-r", "-t", tmp)}");
+						Log.Debug($"PUSH {tmp}: {_client.Push(file, tmp, 420)}");
+						Log.Debug($"INSTALL {tmp}: {_client.Shell("pm", "install", "-r", "-t", tmp)}");
 					}
 				}
 			}
@@ -887,11 +956,11 @@ namespace HAtxLib {
 			#region minicap
 			public void SetupMinicap() {
 				if (_abi == "x86") {
-					Console.WriteLine("abi:x86 not supported well, skip install minicap");
+					Log.Warn("abi:x86 not supported well, skip install minicap");
 					return;
 				}
 				if (int.Parse(_sdk) > 30) {
-					Console.WriteLine("Android R (sdk:30) has no minicap resource");
+					Log.Warn("Android R (sdk:30) has no minicap resource");
 					return;
 				}
 				string base_url = $"{GITHUB_BASEURL}/stf-binaries/raw/0.3.0/node_modules/@devicefarmer/minicap-prebuilt/prebuilt/";
@@ -901,13 +970,13 @@ namespace HAtxLib {
 					string so_url = $"{base_url}{_abi}/lib/android-{_sdk}/minicap.so";
 					string so_file = $"{CACHE_PATH}minicap/{_abi}/minicap.so";
 					GithubDown(so_url, so_file);
-					Console.WriteLine($"PUSH {ANDROID_LOCAL_TMP_PATH}minicap.so: {_client.Push(so_file, $"{ANDROID_LOCAL_TMP_PATH}minicap.so")}");
+					Log.Debug($"PUSH {ANDROID_LOCAL_TMP_PATH}minicap.so: {_client.Push(so_file, $"{ANDROID_LOCAL_TMP_PATH}minicap.so")}");
 				}
 				if (!list.Contains("minicap")) {
 					string minicap_url = $"{base_url}{_abi}/bin/minicap";
 					string minicap_file = $"{CACHE_PATH}minicap/{_abi}/minicap";
 					GithubDown(minicap_url, minicap_file);
-					Console.WriteLine($"PUSH {ANDROID_LOCAL_TMP_PATH}minicap: {_client.Push(minicap_file, $"{ANDROID_LOCAL_TMP_PATH}minicap")}");
+					Log.Debug($"PUSH {ANDROID_LOCAL_TMP_PATH}minicap: {_client.Push(minicap_file, $"{ANDROID_LOCAL_TMP_PATH}minicap")}");
 				}
 			}
 			#endregion
@@ -920,7 +989,7 @@ namespace HAtxLib {
 					string base_url = $"{GITHUB_BASEURL}/stf-binaries/raw/0.3.0/node_modules/@devicefarmer/minitouch-prebuilt/prebuilt/{_abi}/bin/minitouch";
 					string minitouch_file = $"{CACHE_PATH}minitouch/{_abi}/minitouch";
 					GithubDown(base_url, minitouch_file);
-					Console.WriteLine($"PUSH {ANDROID_LOCAL_TMP_PATH}minitouch: {_client.Push(minitouch_file, $"{ANDROID_LOCAL_TMP_PATH}minitouch")}");
+					Log.Debug($"PUSH {ANDROID_LOCAL_TMP_PATH}minitouch: {_client.Push(minitouch_file, $"{ANDROID_LOCAL_TMP_PATH}minitouch")}");
 				}
 			}
 			#endregion
@@ -939,7 +1008,7 @@ namespace HAtxLib {
 						try {
 							Directory.Delete(CACHE_PATH, true);
 						} catch (Exception ex) {
-							Console.WriteLine($"Clear cache path exception: {ex}");
+							Log.Error($"Clear cache path exception: {ex}");
 						}
 					}
 				}
@@ -980,12 +1049,12 @@ namespace HAtxLib {
 							client.DownloadFile(url, file);
 						}
 					});
-					Console.WriteLine($"DOWN {file}: 完成");
+					Log.Info($"DOWN {file}: 完成");
 				} catch (Exception) {
 					if (File.Exists(file)) {
 						File.Delete(file);
 					}
-					Console.WriteLine($"DOWN {file}: 失败");
+					Log.Error($"DOWN {file}: 失败");
 				} finally {
 					DownLock.ExitWriteLock();
 				}

@@ -4,17 +4,15 @@ using HAtxLib.Extend;
 using HAtxLib.Utils;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using static HAtxLib.Utils.HLog;
 
 namespace HAtxLib.ADB {
-    public class ADBSocket : IDisposable {
+	public class ADBSocket : IDisposable {
         private readonly HLog Log;
         private const string DefaultEncoding = "ISO-8859-1";
         public static Encoding Encoding { get; } = Encoding.GetEncoding(DefaultEncoding);
@@ -33,12 +31,24 @@ namespace HAtxLib.ADB {
         }
 
         public ADBSocket(string serial, int port = 5037) {
-            Log = HLog.Get<ADBSocket>($"ADB套接字<{serial}>");
+			Log = HLog.Get<ADBSocket>($"ADB套接字<{serial}>");
             _serial = serial;
             _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            _socket.ReceiveTimeout = 5000;
+            _socket.SendTimeout = 5000;
             _port = port;
             SafeConnect();
         }
+
+        public static ADBSocket Create() {
+            return new ADBSocket();
+        }
+
+        internal ADBSocket(int port = 5037) {
+			_socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+			_port = port;
+			SafeConnect();
+		}
 
         #region Connect
         private void Connect() {
@@ -49,7 +59,7 @@ namespace HAtxLib.ADB {
             try {
                 Connect();
             } catch (Exception) {
-                HProcess.Run("adb", "start-server");
+                ADBServer.StartServer();
                 Connect();
             }
         }
@@ -67,7 +77,6 @@ namespace HAtxLib.ADB {
             byte[] result = Encoding.GetBytes(resultStr);
             _socket.Send(result);
             CheckOkay();
-            //PrintDebug($"{command} > True");
         }
         #endregion
 
@@ -169,7 +178,7 @@ namespace HAtxLib.ADB {
                     byte[] buf = new byte[4];
                     socket._socket.Receive(buf, 0, buf.Length, SocketFlags.None);
                     string state = Encoding.GetString(buf);
-                    //socket.PrintDebug($"{file} -> {path} {state} {(state == OKAY ? " " : socket.ReadToClose())}");
+                    socket.Log.Debug($"{file} -> {path} {state} {(state == OKAY ? " " : socket.ReadToClose())}");
                     return state == OKAY;
                 }
             }
@@ -184,10 +193,30 @@ namespace HAtxLib.ADB {
             _socket.Send(result);
             CheckOkay();
         }
-        #endregion
+		#endregion
 
-        #region 验证请求
-        private void CheckOkay() {
+		#region 获取状态
+        public string GetState() {
+			OpenTransport("get-state");
+			return ReadToEnd();
+		}
+		#endregion
+
+		#region 发送指令
+
+		public string Command(params object[] argv) {
+			string command = string.Join(":", argv);
+			string resultStr = string.Format("{0}{1}", command.Length.ToString("X4"), command);
+			byte[] result = Encoding.GetBytes(resultStr);
+			_socket.Send(result);
+			CheckOkay();
+            return ReadToEnd();
+		}
+
+		#endregion
+
+		#region 验证请求
+		private void CheckOkay() {
             byte[] buf = new byte[4];
             _socket.Receive(buf, 0, 4, SocketFlags.None);
             string state = Encoding.GetString(buf);
@@ -246,7 +275,7 @@ namespace HAtxLib.ADB {
                     if (count < 0) {
                         throw new ADBSocketException("EOF");
                     } else if (count == 0) {
-                        Console.WriteLine("DONE with Read");
+                        Log.Info("DONE with Read");
                     } else {
                         Array.Copy(buffer, 0, data, totalRead, count);
                         totalRead += count;
@@ -287,20 +316,14 @@ namespace HAtxLib.ADB {
             }
             throw new ADBSocketException("No free port found");
         }
-        #endregion
+		#endregion
 
-        private void PrintDebug(string format, params object[] value) {
-            if (IsDebug) {
-                StackTrace st = new StackTrace(true);
-                StackFrame sf = st.GetFrame(1);
-                Log.WriteLine(LogLevel.Error, sf.GetMethod().Name, format, value);
-            }
-        }
-
-        public void Dispose() {
+		#region 释放
+		public void Dispose() {
             try { _socket.Shutdown(SocketShutdown.Both); } catch { }
             try { _socket.Close(); } catch { }
             try { _socket.Dispose(); } catch { }
         }
-    }
+		#endregion
+	}
 }

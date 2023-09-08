@@ -1,5 +1,5 @@
 ﻿using HAtxLib;
-using Newtonsoft.Json.Linq;
+using HAtxLib.Utils;
 using System;
 using System.Diagnostics;
 using System.Drawing;
@@ -32,7 +32,6 @@ namespace UIAndroidControl {
 		private readonly ReaderWriterLockSlim _lock = new ReaderWriterLockSlim();
 		private WebSocket MinicapClient;
 		private WebSocket MinitouchClient;
-		
 
 		public UIMain() {
 			InitializeComponent();

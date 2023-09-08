@@ -151,5 +151,20 @@ namespace HAtxLib.ADB {
 			return list;
 		}
 
+
+
+
+		public void Swipe(int dx, int dy, int ux, int uy) {
+			ADBSocket.Shell(_serial, "input", "swipe", dx, dy, ux, uy);
+		}
+
+
+		public static string Devices() {
+			using (ADBSocket socket = ADBSocket.Create()) {
+				return socket.Command("host", "devices");
+			}
+		}
+
+		
 	}
 }

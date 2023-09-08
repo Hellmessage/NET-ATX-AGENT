@@ -3,16 +3,32 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Dynamic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace HAtxLib.Utils {
-	internal class HLog {
+	public class HLog {
+		public static bool InDebug = false;
 		private readonly static object _lock = new object();
 		private string _class;
 		private string _name;
 
-        internal static HLog Get<T>(string prefix) {
+		[DllImport("kernel32.dll")]
+		internal static extern bool AllocConsole();
+
+		[DllImport("kernel32.dll")]
+		internal static extern bool FreeConsole();
+
+		public static void OpenConsole() {
+			AllocConsole();
+		}
+
+		public static void CloseConsole() {
+			FreeConsole();
+		}
+
+		public static HLog Get<T>(string prefix) {
 			return new HLog() {
 				_class = typeof(T).Name,
 				_name = prefix,
@@ -27,7 +43,9 @@ namespace HAtxLib.Utils {
 		}
 
 		public void Debug(string format, params object[] argv) {
-			Log(LogLevel.Debug, format, argv);
+			if (InDebug) {
+				Log(LogLevel.Debug, format, argv);
+			}
 		}
 
 		public void Warn(string format, params object[] argv) {
@@ -44,7 +62,7 @@ namespace HAtxLib.Utils {
 			WriteLine(level, sf.GetMethod().Name, format, argv);
 		}
 
-		public void WriteLine(LogLevel level, string method, string format, params object[] argv) {
+		internal void WriteLine(LogLevel level, string method, string format, params object[] argv) {
 			lock(_lock) {
 				string str = format;
 				if (argv.Length > 0) {

@@ -133,7 +133,6 @@
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
     <Compile Include="Script\IScript.cs" />
-    <Compile Include="Script\ScriptInterpreter.cs" />
     <Compile Include="UIAutomator\By.cs" />
     <Compile Include="UIAutomator\Model\UADeviceInfo.cs" />
     <Compile Include="UIAutomator\UIAutomatorService.cs" />
@@ -141,6 +140,8 @@
     <Compile Include="Utils\HLog.cs" />
     <Compile Include="Utils\HProcess.cs" />
     <Compile Include="Utils\HSocket.cs" />
+    <Compile Include="Utils\HThread.cs" />
+    <Compile Include="Utils\HTry.cs" />
     <Compile Include="Utils\HZip.cs" />
     <Compile Include="Utils\HRuntime.cs" />
     <Compile Include="UIAutomator\Model\JsonRpcResponse.cs" />
